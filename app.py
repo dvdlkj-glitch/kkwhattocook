@@ -6,6 +6,8 @@ Streamlit Dashboard — deploy: streamlit run app.py
 RWD: 手機 / 平板 / 折疊機自適應
 """
 import os
+import base64
+import functools
 import random
 from collections import defaultdict
 
@@ -27,7 +29,7 @@ st.set_page_config(
 RECIPE_BY_ID = {r["id"]: r for r in RECIPES}
 DAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
 DAY_EMOJIS = ["🌷", "🌼", "🌺", "🌻", "🌹", "🌸", "💐"]
-IMG_DIR = "images"
+IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images")
 
 # ---------------------------------------------------------------- 主題 CSS（玫瑰豆沙粉）
 st.markdown("""
@@ -276,25 +278,30 @@ def week_cost(plan: dict, n: int):
     hi = sum(scaled_cost(RECIPE_BY_ID[rid], n)[1] for p in plan.values() for rid in p.values())
     return lo, hi
 
+@functools.lru_cache(maxsize=64)
+def _img_b64(path: str) -> str:
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
 def render_meal_card(day: str, meal: str, rid: str, n: int, elderly: bool, kids: bool):
     r = RECIPE_BY_ID[rid]
     lo, hi = scaled_cost(r, n)
     tag_cls = "tag-lunch" if meal == "lunch" else "tag-dinner"
     tag_txt = "🍱 午餐" if meal == "lunch" else "🌙 晚餐"
-    img_path = os.path.join(IMG_DIR, r.get("img", ""))
+    img_path = os.path.join(IMG_DIR, r.get("img", "") or "_none_")
+    if os.path.exists(img_path):
+        visual = ("<img src='data:image/jpeg;base64," + _img_b64(img_path) +
+                  "' style='width:100%;border-radius:14px;display:block;margin:6px 0'/>")
+    else:
+        visual = f"<div class='emoji-hero'>{r['emoji']}</div>"
     chips = "".join(f"<span class='chip'>{nm} {amt}{u}</span>"
                     for nm, amt, u, _ in r["ingredients"][:6])
     note_html = ""
     if elderly and r.get("elderly_note"):
         note_html = f"<div class='note'>👵 {r['elderly_note']}</div>"
-
-    st.markdown(f"<div class='meal-card'><span class='meal-tag {tag_cls}'>{tag_txt}</span>",
-                unsafe_allow_html=True)
-    if os.path.exists(img_path):
-        st.image(img_path, use_container_width=True)
-    else:
-        st.markdown(f"<div class='emoji-hero'>{r['emoji']}</div>", unsafe_allow_html=True)
     st.markdown(
+        f"<div class='meal-card'><span class='meal-tag {tag_cls}'>{tag_txt}</span>"
+        f"{visual}"
         f"<div class='meal-name'>{r['name']}</div>"
         f"<span class='cost-badge'>💰 RM {lo} – {hi}</span>"
         f"<div style='margin-top:6px'>{chips}</div>"
@@ -379,6 +386,10 @@ tab_week, tab_shop, tab_budget, tab_market, tab_elderly, tab_tips = st.tabs(
 
 # ---- 📅 一週菜單
 with tab_week:
+    _has_photo = any(os.path.exists(os.path.join(IMG_DIR, RECIPE_BY_ID[rid].get("img", "") or "x"))
+                     for p in plan.values() for rid in p.values())
+    if not _has_photo:
+        st.info("📷 尚未偵測到 images/ 資料夾內的菜餚照片，先以可愛圖示顯示。把照片上傳到 GitHub 的 images/ 後重新整理即可。")
     for chunk_start in (0, 4):
         days_chunk = DAYS[chunk_start:chunk_start + 4] if chunk_start == 0 else DAYS[4:]
         cols = st.columns(len(days_chunk))
