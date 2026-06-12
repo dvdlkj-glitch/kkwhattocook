@@ -167,6 +167,28 @@ div[data-testid="stButton"] > button[kind="primary"] {
   .stat .v { font-size: 1.15rem; }
 }
 
+/* 一週菜單：一天一卡 */
+.day-card {
+  background:#FFFFFF; border-radius:20px; border:1.5px solid #F0D5DD;
+  box-shadow: 0 5px 16px rgba(180,90,120,.10);
+  padding: 14px 14px 10px 14px; margin-bottom: 8px;
+}
+.day-head {
+  display:flex; justify-content:space-between; align-items:center;
+  font-weight:900; color:#8E4560; font-size:1.05rem; margin-bottom:8px;
+}
+.day-cost {
+  background:#FBE9EE; color:#B4456A; font-size:.76rem; font-weight:800;
+  border-radius:999px; padding:2px 10px; white-space:nowrap;
+}
+.meal-img {
+  width:100%; height:110px; object-fit:cover; border-radius:12px;
+  display:block; margin:6px 0;
+}
+.day-card .meal-name { min-height:2.9em; font-size:.95rem; }
+.day-card .emoji-hero { height:110px; display:flex; align-items:center; justify-content:center; margin:6px 0; padding:0; }
+.day-divider { border-top:1.5px dashed #F0D5DD; margin:10px 0 8px 0; }
+
 /* emoji 大圖示佔位 */
 .emoji-hero {
   font-size: 2.6rem; text-align:center; background:#FBEFF2;
@@ -284,41 +306,55 @@ def _img_b64(path: str) -> str:
     with open(path, "rb") as f:
         return base64.b64encode(f.read()).decode()
 
-def render_meal_card(day: str, meal: str, rid: str, n: int, elderly: bool, kids: bool):
+def _meal_block(meal: str, rid: str, n: int) -> str:
     r = RECIPE_BY_ID[rid]
     lo, hi = scaled_cost(r, n)
     tag_cls = "tag-lunch" if meal == "lunch" else "tag-dinner"
     tag_txt = "🍱 午餐" if meal == "lunch" else "🌙 晚餐"
     img_path = os.path.join(IMG_DIR, r.get("img", "") or "_none_")
     if os.path.exists(img_path):
-        visual = ("<img src='data:image/jpeg;base64," + _img_b64(img_path) +
-                  "' style='width:100%;border-radius:14px;display:block;margin:6px 0'/>")
+        visual = ("<img class='meal-img' src='data:image/jpeg;base64," +
+                  _img_b64(img_path) + "'/>")
     else:
         visual = f"<div class='emoji-hero'>{r['emoji']}</div>"
-    chips = "".join(f"<span class='chip'>{nm} {amt}{u}</span>"
-                    for nm, amt, u, _ in r["ingredients"][:6])
-    note_html = ""
-    if elderly and r.get("elderly_note"):
-        note_html = f"<div class='note'>👵 {r['elderly_note']}</div>"
+    return (f"<div><span class='meal-tag {tag_cls}'>{tag_txt}</span>"
+            f"{visual}"
+            f"<div class='meal-name'>{r['name']}</div>"
+            f"<span class='cost-badge'>💰 RM {lo} – {hi}</span></div>")
+
+def render_day_card(day: str, n: int, elderly: bool):
+    i = DAYS.index(day)
+    lrid, drid = plan[day]["lunch"], plan[day]["dinner"]
+    llo, lhi = scaled_cost(RECIPE_BY_ID[lrid], n)
+    dlo, dhi = scaled_cost(RECIPE_BY_ID[drid], n)
     st.markdown(
-        f"<div class='meal-card'><span class='meal-tag {tag_cls}'>{tag_txt}</span>"
-        f"{visual}"
-        f"<div class='meal-name'>{r['name']}</div>"
-        f"<span class='cost-badge'>💰 RM {lo} – {hi}</span>"
-        f"<div style='margin-top:6px'>{chips}</div>"
-        f"<div style='font-size:0.78rem;color:#B08597;margin-top:5px'>💡 {r['tip']}</div>"
-        f"{note_html}</div>",
+        f"<div class='day-card'>"
+        f"<div class='day-head'><span>{DAY_EMOJIS[i]} {day}</span>"
+        f"<span class='day-cost'>全日 RM {llo + dlo} – {lhi + dhi}</span></div>"
+        f"{_meal_block('lunch', lrid, n)}"
+        f"<div class='day-divider'></div>"
+        f"{_meal_block('dinner', drid, n)}"
+        f"</div>",
         unsafe_allow_html=True,
     )
-    st.button("🔄 換一道", key=f"swap_{day}_{meal}",
-              on_click=swap_recipe, args=(day, meal), use_container_width=True)
-    with st.expander("👩‍🍳 簡要做法・教學影片"):
-        for si, step in enumerate(r.get("steps", []), 1):
-            st.markdown(f"**{si}.** {step}")
-        _q = urllib.parse.quote(r.get("yt", r["name"] + " 做法"))
-        st.link_button("📺 看 YouTube 教學影片",
-                       f"https://www.youtube.com/results?search_query={_q}",
-                       use_container_width=True)
+    b1, b2 = st.columns(2)
+    b1.button("🔄 換午餐", key=f"swap_{day}_lunch",
+              on_click=swap_recipe, args=(day, "lunch"), use_container_width=True)
+    b2.button("🔄 換晚餐", key=f"swap_{day}_dinner",
+              on_click=swap_recipe, args=(day, "dinner"), use_container_width=True)
+    with st.expander("👩‍🍳 食材・做法・影片"):
+        for label, rid in (("🍱 午餐", lrid), ("🌙 晚餐", drid)):
+            r = RECIPE_BY_ID[rid]
+            st.markdown(f"**{label}｜{r['name']}**")
+            st.caption("、".join(f"{nm} {amt}{u}" for nm, amt, u, _ in r["ingredients"]))
+            for si, step in enumerate(r.get("steps", []), 1):
+                st.markdown(f"{si}. {step}")
+            if elderly and r.get("elderly_note"):
+                st.markdown(f"👵 {r['elderly_note']}")
+            _q = urllib.parse.quote(r.get("yt", r["name"] + " 做法"))
+            st.link_button(f"📺 {label[2:]}教學影片",
+                           f"https://www.youtube.com/results?search_query={_q}",
+                           use_container_width=True)
 
 # ---------------------------------------------------------------- 頁首
 st.markdown("""
@@ -402,12 +438,8 @@ with tab_week:
         days_chunk = DAYS[chunk_start:chunk_start + 4] if chunk_start == 0 else DAYS[4:]
         cols = st.columns(len(days_chunk))
         for col, day in zip(cols, days_chunk):
-            i = DAYS.index(day)
             with col:
-                st.markdown(f"<div class='day-header'>{DAY_EMOJIS[i]} {day}</div>",
-                            unsafe_allow_html=True)
-                render_meal_card(day, "lunch", plan[day]["lunch"], n, sel_elderly, sel_kids)
-                render_meal_card(day, "dinner", plan[day]["dinner"], n, sel_elderly, sel_kids)
+                render_day_card(day, n, sel_elderly)
 
 # ---- 🛒 採買清單
 with tab_shop:
