@@ -8,6 +8,9 @@ RWD: 手機 / 平板 / 折疊機自適應
 import os
 import base64
 import urllib.parse
+import urllib.request
+import tempfile
+import datetime
 import functools
 import random
 from collections import defaultdict
@@ -356,6 +359,70 @@ def render_day_card(day: str, n: int, elderly: bool):
                            f"https://www.youtube.com/results?search_query={_q}",
                            use_container_width=True)
 
+# ---------------------------------------------------------------- 官方物價 PriceCatcher
+PC_BASE = "https://storage.data.gov.my/pricecatcher"
+
+OFFICIAL_ITEMS = [
+    ("🐟 甘望魚 Ikan Kembung", ["IKAN KEMBUNG"]),
+    ("🐠 馬鮫魚 Ikan Tenggiri", ["IKAN TENGGIRI"]),
+    ("🦐 蝦 Udang", ["UDANG"]),
+    ("🐡 紅鰽魚 / 石斑", ["IKAN MERAH", "KERAPU"]),
+    ("🍗 雞肉 Ayam", ["AYAM STANDARD", "AYAM SUPER", "AYAM BERSIH"]),
+    ("🥚 雞蛋 Telur", ["TELUR AYAM"]),
+    ("🍅 番茄 Tomato", ["TOMATO"]),
+    ("🧅 洋蔥 Bawang", ["BAWANG BESAR"]),
+    ("🥬 菜心 / 小白菜 Sawi", ["SAWI"]),
+    ("🌶️ 辣椒 Cili", ["CILI"]),
+]
+
+def _read_parquet_url(url: str) -> pd.DataFrame:
+    fn = os.path.join(tempfile.gettempdir(), os.path.basename(url))
+    if not os.path.exists(fn):
+        urllib.request.urlretrieve(url, fn)
+    return pd.read_parquet(fn)
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+def fetch_official_prices():
+    """抓 PriceCatcher 當月資料，篩出 Kota Kinabalu 店家，回傳重點品項中位價"""
+    premise = _read_parquet_url(f"{PC_BASE}/lookup_premise.parquet")
+    items = _read_parquet_url(f"{PC_BASE}/lookup_item.parquet")
+    kk_codes = set(premise.loc[
+        premise["district"].astype(str).str.contains("Kota Kinabalu", case=False, na=False),
+        "premise_code"])
+    today = datetime.date.today()
+    months = [today.strftime("%Y-%m"),
+              (today.replace(day=1) - datetime.timedelta(days=1)).strftime("%Y-%m")]
+    df, used_month = None, None
+    for m in months:
+        try:
+            df = _read_parquet_url(f"{PC_BASE}/pricecatcher_{m}.parquet")
+            used_month = m
+            break
+        except Exception:
+            continue
+    if df is None:
+        raise RuntimeError("無法下載 PriceCatcher 資料")
+    df = df[df["premise_code"].isin(kk_codes)]
+    df = df[df["price"] > 0]
+    df = df.merge(items[["item_code", "item", "unit"]], on="item_code", how="left")
+    df["item"] = df["item"].astype(str).str.upper()
+    last_date = pd.to_datetime(df["date"]).max()
+    recent = df[pd.to_datetime(df["date"]) >= last_date - pd.Timedelta(days=14)]
+    rows = []
+    for label, kws in OFFICIAL_ITEMS:
+        m = recent[recent["item"].str.contains("|".join(kws), na=False)]
+        if len(m) < 3:
+            continue
+        unit = m["unit"].mode().iloc[0] if len(m["unit"].mode()) else "-"
+        rows.append({"品項": label,
+                     "KK 中位價 (RM)": round(float(m["price"].median()), 2),
+                     "單位": unit,
+                     "樣本數": int(len(m))})
+    table = pd.DataFrame(rows)
+    meta = {"month": used_month, "last_date": str(last_date.date()),
+            "premises": int(len(kk_codes))}
+    return table, meta
+
 # ---------------------------------------------------------------- 頁首
 st.markdown("""
 <div class='hero'>
@@ -526,6 +593,26 @@ with tab_market:
     st.dataframe(sf, use_container_width=True, hide_index=True)
     st.markdown("<div class='card'><b style='color:#8E4560'>🧺 買海鮮小貼士</b><br>" +
                 "<br>".join(MARKET_TIPS[:5]) + "</div>", unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>📊 亞庇官方物價（政府每日實地採集）</div>",
+                unsafe_allow_html=True)
+    if st.button("📊 載入 / 更新官方行情", key="load_official"):
+        st.session_state["show_official"] = True
+    if st.session_state.get("show_official"):
+        try:
+            with st.spinner("正在下載官方數據，首次載入約 10–30 秒…"):
+                otable, ometa = fetch_official_prices()
+            if len(otable):
+                st.dataframe(otable, use_container_width=True, hide_index=True)
+                st.caption(
+                    f"資料來源：PriceCatcher（馬來西亞國內貿易部 KPDN + 統計局 DOSM，"
+                    f"data.gov.my，CC BY 4.0）｜資料月份 {ometa['month']}｜"
+                    f"最新日期 {ometa['last_date']}（近 14 天中位數）｜"
+                    f"覆蓋 Kota Kinabalu 店家 {ometa['premises']} 家。"
+                    f"官方採價多為超市與零售店，濕市場（如麗都）價格可能略有差異，僅供參考。")
+            else:
+                st.info("目前抓不到亞庇的相關品項資料，請過幾天再試。")
+        except Exception:
+            st.warning("官方數據暫時無法載入（來源網站忙碌或網路問題），請稍後再按一次。")
 
 # ---- 👵 樂齡專區
 with tab_elderly:
