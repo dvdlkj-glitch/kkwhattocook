@@ -7,6 +7,7 @@ RWD: 手機 / 平板 / 折疊機自適應
 """
 import os
 import base64
+import urllib.parse
 import functools
 import random
 from collections import defaultdict
@@ -311,6 +312,13 @@ def render_meal_card(day: str, meal: str, rid: str, n: int, elderly: bool, kids:
     )
     st.button("🔄 換一道", key=f"swap_{day}_{meal}",
               on_click=swap_recipe, args=(day, meal), use_container_width=True)
+    with st.expander("👩‍🍳 簡要做法・教學影片"):
+        for si, step in enumerate(r.get("steps", []), 1):
+            st.markdown(f"**{si}.** {step}")
+        _q = urllib.parse.quote(r.get("yt", r["name"] + " 做法"))
+        st.link_button("📺 看 YouTube 教學影片",
+                       f"https://www.youtube.com/results?search_query={_q}",
+                       use_container_width=True)
 
 # ---------------------------------------------------------------- 頁首
 st.markdown("""
@@ -427,8 +435,17 @@ with tab_shop:
         lines += [f"  □ {nm}  {qty}" for nm, qty in items]
         lines.append("")
     lines += ["—" * 20] + MARKET_TIPS
-    st.download_button("⬇️ 下載採買清單（帶去市場）", "\n".join(lines),
-                       file_name="本週採買清單.txt", use_container_width=False)
+    dl1, dl2 = st.columns(2)
+    with dl1:
+        st.download_button("⬇️ 下載採買清單（帶去市場）", "\n".join(lines),
+                           file_name="本週採買清單.txt", use_container_width=True)
+    with dl2:
+        _wa = "\n".join(lines)
+        if len(_wa) > 1500:
+            _wa = _wa[:1500] + "\n…"
+        st.link_button("💬 用 WhatsApp 分享清單",
+                       "https://wa.me/?text=" + urllib.parse.quote(_wa),
+                       use_container_width=True)
 
 # ---- 💰 花費總覽
 with tab_budget:
