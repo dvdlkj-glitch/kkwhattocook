@@ -3,6 +3,7 @@
 🌸 今天煮什麼？— 亞庇家庭買菜煮飯小幫手
 Kota Kinabalu Family Meal Planner (Lido Market + Damai Fresh Market)
 Streamlit Dashboard — deploy: streamlit run app.py
+RWD: 手機 / 平板 / 折疊機自適應
 """
 import os
 import random
@@ -122,6 +123,46 @@ div[data-testid="stButton"] > button[kind="primary"] {
 
 /* 表格 */
 [data-testid="stDataFrame"] { border-radius: 14px; overflow: hidden; }
+
+/* ---------- 📱 手機 / 平板 / 折疊機自適應 ---------- */
+/* 統計小卡列：自動換行 */
+.stats-row { display:flex; flex-wrap:wrap; gap:10px; margin: 4px 0 10px 0; }
+.stats-row .stat { flex: 1 1 160px; }
+
+/* Tabs 在窄螢幕可左右滑動，不會擠成兩行 */
+.stTabs [data-baseweb="tab-list"] {
+  overflow-x: auto; flex-wrap: nowrap; scrollbar-width: none;
+  -webkit-overflow-scrolling: touch; padding-bottom: 4px;
+}
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display: none; }
+.stTabs [data-baseweb="tab"] { white-space: nowrap; flex-shrink: 0; }
+
+/* 按鈕加大觸控面積（手指好按） */
+.stButton > button { min-height: 2.5rem; }
+
+/* 平板 / 折疊機展開（≤1024px）：欄位自動換行，一排最多 2 欄 */
+@media (max-width: 1024px) {
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.7rem !important; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    flex: 1 1 45% !important; min-width: 45% !important; width: auto !important;
+  }
+}
+
+/* 手機直向（≤640px）：一排一欄、字體與留白縮小 */
+@media (max-width: 640px) {
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    flex: 1 1 100% !important; min-width: 100% !important;
+  }
+  .block-container { padding: 0.9rem 0.7rem !important; }
+  .hero { padding: 18px 20px; border-radius: 18px; }
+  .hero h1 { font-size: 1.35rem; }
+  .hero p { font-size: 0.8rem; }
+  .meal-card { min-height: unset; }
+  .day-header { font-size: 1.05rem; }
+  .stat .v { font-size: 1.15rem; }
+}
 
 /* emoji 大圖示佔位 */
 .emoji-hero {
@@ -323,12 +364,14 @@ sel_kids = st.session_state["opts"]["kids"]
 lo, hi = week_cost(plan, n)
 seafood_meals = sum(1 for p in plan.values() for rid in p.values()
                     if RECIPE_BY_ID[rid]["protein"] in ("魚", "蝦", "海鮮"))
-s1, s2, s3, s4 = st.columns(4)
-s1.markdown(f"<div class='stat'><div class='v'>RM {lo} – {hi}</div><div class='l'>本週預估買菜費</div></div>", unsafe_allow_html=True)
-s2.markdown(f"<div class='stat'><div class='v'>14 餐</div><div class='l'>午餐 7 + 晚餐 7</div></div>", unsafe_allow_html=True)
-s3.markdown(f"<div class='stat'><div class='v'>{seafood_meals} 餐</div><div class='l'>有魚 / 海鮮</div></div>", unsafe_allow_html=True)
-s4.markdown(f"<div class='stat'><div class='v'>{n} 人</div><div class='l'>用餐人數</div></div>", unsafe_allow_html=True)
-st.markdown("")
+st.markdown(f"""
+<div class='stats-row'>
+  <div class='stat'><div class='v'>RM {lo} – {hi}</div><div class='l'>本週預估買菜費</div></div>
+  <div class='stat'><div class='v'>14 餐</div><div class='l'>午餐 7 + 晚餐 7</div></div>
+  <div class='stat'><div class='v'>{seafood_meals} 餐</div><div class='l'>有魚 / 海鮮</div></div>
+  <div class='stat'><div class='v'>{n} 人</div><div class='l'>用餐人數</div></div>
+</div>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------- 分頁
 tab_week, tab_shop, tab_budget, tab_market, tab_elderly, tab_tips = st.tabs(
