@@ -450,6 +450,16 @@ with tab_budget:
 with tab_market:
     st.markdown("<div class='section-title'>🐟 麗都市場常見海鮮行情（RM / 公斤）</div>",
                 unsafe_allow_html=True)
+    _mkt = [("market_tenggiri.jpg", "馬鮫魚 Ikan Tenggiri"),
+            ("market_kembung.jpg", "甘望魚 Ikan Kembung"),
+            ("market_udang.jpg", "本地白蝦 Udang"),
+            ("market_merah.jpg", "紅鰽魚 / 石斑")]
+    if any(os.path.exists(os.path.join(IMG_DIR, f)) for f, _ in _mkt):
+        mcols = st.columns(4)
+        for col, (fn, cap) in zip(mcols, _mkt):
+            p = os.path.join(IMG_DIR, fn)
+            if os.path.exists(p):
+                col.image(p, caption=cap, use_container_width=True)
     sf = pd.DataFrame([{"海鮮": f"{e} {zh}", "馬來名稱": my,
                         "價格 (RM/kg)": f"RM {a} – {b}", "特點 / 料理方式": note}
                        for zh, my, e, a, b, note in SEAFOOD_PRICES])
