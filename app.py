@@ -465,7 +465,13 @@ def pick_by_ingredients(sels, days: int, seed: int):
 # ---------------------------------------------------------------- 頁首
 st.markdown("""
 <div class='hero'>
-  <h1>🌸 今天煮什麼？</h1>
+  <div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px'>
+    <h1>🌸 今天煮什麼？</h1>
+    <span style='background:rgba(255,248,249,.18); border:1px solid rgba(244,217,166,.55);
+                 color:#F4D9A6; font-size:.78rem; font-weight:700; letter-spacing:.5px;
+                 border-radius:999px; padding:4px 14px; white-space:nowrap'>
+      ✦ David Lau Cooking Market Project</span>
+  </div>
   <p>亞庇家庭買菜煮飯小幫手 ｜ <span class='gold'>麗都市場 Lido Market</span> ＆
      <span class='gold'>生源 Damai Fresh Market</span> ｜ 行情報告・配套推薦・一鍵排餐 💕</p>
 </div>
