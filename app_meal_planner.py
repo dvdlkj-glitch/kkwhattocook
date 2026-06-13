@@ -191,6 +191,19 @@ div[data-testid="stButton"] > button[kind="primary"]:active{ transform:scale(.97
   .block-container{ padding:.6rem .5rem 3rem!important; }
 }
 footer{ visibility:hidden; }
+
+.yt-wrap{ position:relative; border-radius:14px; overflow:hidden; height:140px;
+  box-shadow:0 6px 16px rgba(180,90,120,.16); }
+.yt-wrap .yt-thumb{ height:100%; box-shadow:none; border-radius:0; }
+.yt-play{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:32px; color:#fff; background:rgba(156,77,104,.16); opacity:0; transition:opacity .2s; }
+.yt-wrap:hover .yt-play{ opacity:1; background:rgba(156,77,104,.34); }
+.yt-card-title{ font-weight:800; color:var(--plum); font-size:.9rem; line-height:1.35;
+  margin-top:8px; height:2.45em; display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden; }
+.yt-card-chan{ font-size:.74rem; color:#A0728B; margin:5px 0 2px; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+@media (max-width:560px){ .yt-wrap{ height:190px; } }
 </style>
 """, unsafe_allow_html=True)
 
@@ -507,34 +520,37 @@ with tab_find:
             cols = st.columns(3)
             for i, card in enumerate(ss.find_cards):
                 with cols[i % 3]:
-                    thumb = card.get("thumbnail_url")
-                    visual = (f"<img class='yt-thumb' src='{thumb}'/>" if thumb
-                              else "<div class='emoji-hero'>🍳</div>")
-                    st.markdown(
-                        f"<div class='pkg-card'>{visual}"
-                        f"<div class='pkg-title'>{card['title'][:48]}</div>"
-                        f"<div class='pkg-desc'>📺 {card['channel']}</div></div>",
-                        unsafe_allow_html=True)
-                    if st.button("▶️ 播放", key=f"play_{card['video_id']}",
-                                 use_container_width=True):
-                        ss.play_vid = card["video_id"]
-                        ss.play_title = card["title"]
-                    if st.button("➕ 排入餐表", key=f"add_{card['video_id']}",
-                                 use_container_width=True):
-                        with st.spinner("抽取食材中…（首次會抽取，之後走快取）"):
-                            try:
-                                rec = R.get_or_build_recipe(
-                                    card, yt_api_key=YT_KEY,
-                                    anthropic_client=claude, supabase=supabase)
-                                MP.add_to_plan(supabase, ss.find_date,
-                                               ss.find_slot, card["video_id"])
-                                flag = "（⚠ 由菜名推測，請核對）" if rec.get("inferred") else ""
-                                st.success(f"已排入 {ss.find_date} {ss.find_slot}："
-                                           f"{rec['title'][:18]}{flag}")
-                            except Exception as e:
-                                st.error(f"排入失敗：{e}")
+                    with st.container(border=True):
+                        thumb = card.get("thumbnail_url")
+                        if thumb:
+                            visual = (f"<div class='yt-wrap'><img class='yt-thumb' src='{thumb}'/>"
+                                      f"<span class='yt-play'>▶</span></div>")
+                        else:
+                            visual = "<div class='emoji-hero'>🍳</div>"
+                        st.markdown(
+                            f"{visual}"
+                            f"<div class='yt-card-title'>{card['title']}</div>"
+                            f"<div class='yt-card-chan'>📺 {card['channel']}</div>",
+                            unsafe_allow_html=True)
+                        if st.button("▶️ 播放", key=f"play_{card['video_id']}",
+                                     use_container_width=True):
+                            ss.play_vid = card["video_id"]
+                            ss.play_title = card["title"]
+                        if st.button("➕ 排入餐表", key=f"add_{card['video_id']}",
+                                     use_container_width=True):
+                            with st.spinner("抽取食材中…"):
+                                try:
+                                    rec = R.get_or_build_recipe(
+                                        card, yt_api_key=YT_KEY,
+                                        anthropic_client=claude, supabase=supabase)
+                                    MP.add_to_plan(supabase, ss.find_date,
+                                                   ss.find_slot, card["video_id"])
+                                    flag = "（⚠ 推測）" if rec.get("inferred") else ""
+                                    st.success(f"已排入 {ss.find_date} {ss.find_slot}："
+                                               f"{rec['title'][:18]}{flag}")
+                                except Exception as e:
+                                    st.error(f"排入失敗：{e}")
 
-        # 內嵌播放器（全寬、可全螢幕）
         if ss.play_vid:
             st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title[:50]}</div>",
                         unsafe_allow_html=True)
