@@ -56,103 +56,140 @@ except Exception:
 # ---------------------------------------------------------------- 主題 CSS
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
-html, body, [class*="css"] { font-family: 'Noto Sans TC', sans-serif; }
-.stApp { background: linear-gradient(180deg, #FDF4F6 0%, #FBEFF2 45%, #F9EAEF 100%); }
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Plus+Jakarta+Sans:wght@600;800&display=swap');
 
-.hero {
-  background: linear-gradient(120deg, #C2698A 0%, #B45A78 55%, #9C4D68 100%);
-  border-radius: 24px; padding: 26px 34px; color: #FFF8F9;
-  box-shadow: 0 10px 30px rgba(180, 90, 120, 0.25); margin-bottom: 10px;
+:root{
+  --pink-1:#C2698A; --pink-2:#A8546F; --pink-3:#9C4D68;
+  --rose:#B4456A; --plum:#8E4560; --gold:#F4D9A6;
+  --bg-1:#FDF4F6; --bg-2:#FBEFF2; --bg-3:#F7E8EE;
+  --card:rgba(255,255,255,.72); --line:rgba(180,90,120,.18);
+  --shadow:0 8px 28px rgba(180,90,120,.14);
 }
-.hero h1 { margin: 0; font-size: 1.9rem; font-weight: 900; letter-spacing: 1px; }
-.hero p  { margin: 6px 0 0 0; font-size: 0.95rem; opacity: 0.92; }
-.hero .gold { color: #F4D9A6; font-weight: 700; }
-
-.card {
-  background: #FFFFFF; border-radius: 20px; padding: 18px 20px;
-  box-shadow: 0 6px 18px rgba(180, 90, 120, 0.10);
-  border: 1px solid #F3DCE3; margin-bottom: 14px;
+*{ -webkit-tap-highlight-color:transparent; }
+html, body, [class*="css"]{ font-family:'Noto Sans TC','Plus Jakarta Sans',sans-serif; }
+.stApp{
+  background:
+    radial-gradient(1200px 600px at 80% -10%, #FDE7EE 0%, transparent 60%),
+    linear-gradient(180deg,var(--bg-1) 0%,var(--bg-2) 45%,var(--bg-3) 100%);
+  background-attachment:fixed;
 }
-div[data-testid="stVerticalBlockBorderWrapper"] {
-  background: #FFFFFF; border: 1.5px solid #F0D5DD !important;
-  border-radius: 20px; box-shadow: 0 5px 16px rgba(180,90,120,.10);
-  padding: 4px 8px;
+.block-container{ max-width:1180px; padding-top:1rem; }
+
+@keyframes floatUp{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
+@keyframes shimmer{ 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+
+.hero{
+  background:linear-gradient(120deg,var(--pink-1),var(--pink-3),var(--pink-2));
+  background-size:200% 200%; animation:shimmer 14s ease infinite alternate;
+  border-radius:26px; padding:24px 28px; color:#FFF8F9;
+  box-shadow:0 18px 40px rgba(156,77,104,.32); position:relative; overflow:hidden;
 }
-.meal-tag { display:inline-block; font-size:0.72rem; font-weight:700;
-  padding:2px 10px; border-radius:999px; margin-bottom:6px; }
-.tag-lunch  { background:#FCEEDF; color:#A6731F; }
-.tag-dinner { background:#EFE0F0; color:#7B4E86; }
-.meal-name { font-size:1.0rem; font-weight:700; color:#6E3B4E; line-height:1.4; }
-.cost-badge { display:inline-block; background:#FBE9EE; color:#B4456A;
-  font-weight:800; font-size:0.86rem; border-radius:10px; padding:3px 10px; margin-top:6px; }
-.chip { display:inline-block; background:#F7F0EA; color:#8A6A52;
-  border-radius:999px; font-size:0.72rem; padding:2px 9px; margin:2px 2px; }
-.note { font-size:0.78rem; color:#9A7C5B; background:#FDF7EC;
-  border-left:3px solid #DDB877; border-radius:6px; padding:5px 9px; margin-top:7px; }
-.section-title { font-size:1.15rem; font-weight:900; color:#8E4560; margin:4px 0 10px 0; }
+.hero::after{ content:''; position:absolute; inset:0;
+  background:radial-gradient(420px 220px at 90% 0%, rgba(255,255,255,.22), transparent 70%); }
+.hero h1{ margin:0; font-size:1.7rem; font-weight:900; letter-spacing:.5px; }
+.hero p{ margin:8px 0 0; font-size:.9rem; opacity:.95; line-height:1.6; }
+.hero .gold{ color:var(--gold); font-weight:800; }
 
-.stats-row { display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 10px 0; }
-.stat { background:#FFFFFF; border-radius:18px; text-align:center; flex:1 1 160px;
-  padding:14px 8px; border:1px solid #F3DCE3; box-shadow:0 4px 14px rgba(180,90,120,.10); }
-.stat .v { font-size:1.35rem; font-weight:900; color:#B4456A; }
-.stat .l { font-size:0.8rem; color:#A0728B; margin-top:2px; }
-
-.stButton > button { border-radius:999px; border:1.5px solid #E5B9C9;
-  color:#8E4560; background:#FFF6F8; font-weight:700; min-height:2.5rem; }
-.stButton > button:hover { border-color:#B4456A; color:#B4456A; background:#FDEDF2; }
-div[data-testid="stButton"] > button[kind="primary"] {
-  background: linear-gradient(120deg, #C2698A, #A8546F); color:#FFF; border:none;
-  font-size:1.05rem; font-weight:900; padding:0.6rem 1.4rem;
-  box-shadow:0 6px 16px rgba(180,90,120,.35); }
-
-.stTabs [data-baseweb="tab-list"] { gap:6px; overflow-x:auto; flex-wrap:nowrap;
-  scrollbar-width:none; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
-.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display:none; }
-.stTabs [data-baseweb="tab"] { background:#FFF6F8; border-radius:999px; padding:6px 16px;
-  border:1px solid #F0D5DD; color:#8E4560; font-weight:700; white-space:nowrap; flex-shrink:0; }
-.stTabs [aria-selected="true"] { background:linear-gradient(120deg,#C2698A,#A8546F)!important;
-  color:#FFF!important; border:none!important; }
-[data-testid="stDataFrame"] { border-radius:14px; overflow:hidden; }
-
-.day-card { background:#FFFFFF; border-radius:20px; border:1.5px solid #F0D5DD;
-  box-shadow:0 5px 16px rgba(180,90,120,.10); padding:14px 14px 10px 14px; margin-bottom:8px; }
-.day-head { display:flex; justify-content:space-between; align-items:center;
-  font-weight:900; color:#8E4560; font-size:1.05rem; margin-bottom:8px; }
-.day-cost { background:#FBE9EE; color:#B4456A; font-size:.76rem; font-weight:800;
-  border-radius:999px; padding:2px 10px; white-space:nowrap; }
-.day-divider { border-top:1.5px dashed #F0D5DD; margin:10px 0 8px 0; }
-
-.pkg-card { background:#FFFFFF; border:1.5px solid #F0D5DD; border-radius:18px;
-  padding:10px 10px 6px 10px; text-align:center;
-  box-shadow:0 4px 12px rgba(180,90,120,.08); margin-bottom:6px; }
-.pkg-title { font-weight:800; color:#8E4560; margin-top:7px; font-size:.92rem; line-height:1.35;
-  min-height:2.5em; }
-.pkg-desc { font-size:.74rem; color:#A0728B; margin-top:2px; }
-
-.yt-thumb { width:100%; height:120px; object-fit:cover; border-radius:12px; display:block; }
-.slot-label { font-size:.8rem; font-weight:800; color:#A8546F; margin:6px 0 2px; }
-.dish-mini { font-size:.82rem; color:#6E3B4E; font-weight:600; line-height:1.3;
-  min-height:2.4em; margin-top:3px; }
-.warn-flag { color:#C77; font-size:.72rem; }
-
-.emoji-hero { font-size:2.6rem; text-align:center; background:#FBEFF2;
-  border-radius:14px; padding:10px 0; margin-bottom:8px; }
-
-@media (max-width: 1024px) {
-  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.7rem !important; }
-  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
-  [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-    flex: 1 1 45% !important; min-width: 45% !important; width: auto !important; }
+.card,.day-card,.pkg-card,.stat,
+div[data-testid="stVerticalBlockBorderWrapper"]{
+  background:var(--card); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+  border:1px solid var(--line)!important; border-radius:20px;
+  box-shadow:var(--shadow); animation:floatUp .5s ease both;
 }
-@media (max-width: 640px) {
-  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
-  [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-    flex: 1 1 100% !important; min-width: 100% !important; }
-  .block-container { padding: 0.9rem 0.7rem !important; }
-  .hero h1 { font-size: 1.35rem; }
+.card{ padding:16px 18px; margin-bottom:14px; }
+.pkg-card{ padding:10px 10px 8px; text-align:center;
+  transition:transform .18s ease, box-shadow .18s ease; }
+.pkg-card:hover{ transform:translateY(-4px); box-shadow:0 16px 34px rgba(180,90,120,.22); }
+.day-card{ padding:12px; margin-bottom:8px; }
+
+.section-title{ font-size:1.18rem; font-weight:900; color:var(--plum);
+  margin:8px 0 12px; display:flex; align-items:center; gap:8px; }
+.section-title::before{ content:''; width:6px; height:20px; border-radius:6px;
+  background:linear-gradient(var(--pink-1),var(--pink-2)); display:inline-block; }
+
+.meal-name,.dish-mini{ color:#6E3B4E; font-weight:700; line-height:1.4; }
+.dish-mini{ font-size:.84rem; min-height:2.3em; margin-top:4px; }
+.pkg-title{ font-weight:800; color:var(--plum); margin-top:8px; font-size:.92rem;
+  line-height:1.35; min-height:2.4em; }
+.pkg-desc{ font-size:.74rem; color:#A0728B; margin-top:2px; }
+.yt-thumb{ width:100%; height:128px; object-fit:cover; border-radius:14px; display:block;
+  box-shadow:0 6px 16px rgba(180,90,120,.16); }
+
+.cost-badge{ display:inline-block; background:linear-gradient(120deg,#FBE9EE,#FCE0EA);
+  color:var(--rose); font-weight:800; font-size:.84rem; border-radius:10px;
+  padding:4px 11px; margin-top:7px; }
+.day-head{ display:flex; justify-content:space-between; align-items:center;
+  font-weight:900; color:var(--plum); font-size:1rem; margin-bottom:8px; }
+.day-cost{ background:#FBE9EE; color:var(--rose); font-size:.74rem; font-weight:800;
+  border-radius:999px; padding:2px 10px; }
+.slot-label{ font-size:.82rem; font-weight:800; color:var(--pink-2); margin:8px 0 2px; }
+.warn-flag{ color:#C77; font-size:.72rem; }
+.day-divider{ border-top:1.5px dashed var(--line); margin:10px 0 8px; }
+.meal-tag{ display:inline-block; font-size:.72rem; font-weight:700; padding:2px 10px;
+  border-radius:999px; margin-bottom:6px; }
+.tag-lunch{ background:#FCEEDF; color:#A6731F; } .tag-dinner{ background:#EFE0F0; color:#7B4E86; }
+.chip{ display:inline-block; background:#F7F0EA; color:#8A6A52; border-radius:999px;
+  font-size:.72rem; padding:2px 9px; margin:2px; }
+.note{ font-size:.78rem; color:#9A7C5B; background:#FDF7EC; border-left:3px solid #DDB877;
+  border-radius:8px; padding:6px 10px; margin-top:8px; }
+.emoji-hero{ font-size:2.4rem; text-align:center; background:#FBEFF2; border-radius:14px;
+  padding:10px 0; margin-bottom:8px; }
+
+.stats-row{ display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 12px; }
+.stat{ flex:1 1 140px; text-align:center; padding:14px 8px; }
+.stat .v{ font-size:1.3rem; font-weight:900; color:var(--rose); }
+.stat .l{ font-size:.78rem; color:#A0728B; margin-top:2px; }
+
+.stButton > button{ border-radius:14px; border:1.5px solid #E9C2CF;
+  color:var(--plum); background:rgba(255,255,255,.7);
+  backdrop-filter:blur(6px); font-weight:800; min-height:2.9rem;
+  transition:transform .12s ease, box-shadow .18s ease, background .2s; }
+.stButton > button:hover{ border-color:var(--rose); color:var(--rose);
+  box-shadow:0 8px 18px rgba(180,90,120,.18); }
+.stButton > button:active{ transform:scale(.97); }
+div[data-testid="stButton"] > button[kind="primary"]{
+  background:linear-gradient(120deg,var(--pink-1),var(--pink-2)); color:#fff; border:none;
+  font-size:1.02rem; font-weight:900; box-shadow:0 10px 22px rgba(180,90,120,.34); }
+div[data-testid="stButton"] > button[kind="primary"]:active{ transform:scale(.97); }
+.stLinkButton > a{ border-radius:14px!important; min-height:2.9rem; font-weight:800!important; }
+
+.stTabs [data-baseweb="tab-list"]{ gap:8px; overflow-x:auto; flex-wrap:nowrap;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:4px 0 10px; }
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar{ display:none; }
+.stTabs [data-baseweb="tab"]{ background:rgba(255,255,255,.7); backdrop-filter:blur(6px);
+  border-radius:999px; padding:8px 16px; border:1px solid var(--line);
+  color:var(--plum); font-weight:800; white-space:nowrap; flex-shrink:0; }
+.stTabs [aria-selected="true"]{ background:linear-gradient(120deg,var(--pink-1),var(--pink-2))!important;
+  color:#fff!important; border:none!important; box-shadow:0 6px 16px rgba(180,90,120,.3); }
+
+[data-testid="stDataFrame"]{ border-radius:16px; overflow:hidden; box-shadow:var(--shadow); }
+
+/* ---------- 響應式（手機優先） ---------- */
+@media (max-width:1024px){
+  [data-testid="stHorizontalBlock"]{ flex-wrap:wrap!important; gap:.7rem!important; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{
+    flex:1 1 48%!important; min-width:48%!important; width:auto!important; }
 }
-footer { visibility: hidden; }
+@media (max-width:768px){
+  .block-container{ padding:.8rem .7rem 3rem!important; }
+  .hero h1{ font-size:1.45rem; } .hero p{ font-size:.82rem; }
+  .yt-thumb{ height:150px; }
+}
+@media (max-width:560px){
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{
+    flex:1 1 100%!important; min-width:100%!important; }
+  .hero{ padding:18px 18px; border-radius:20px; }
+  .hero h1{ font-size:1.3rem; }
+  .section-title{ font-size:1.06rem; }
+  .stButton > button{ min-height:3rem; font-size:1rem; }
+  .stat .v{ font-size:1.15rem; }
+  .yt-thumb{ height:185px; }
+}
+@media (max-width:380px){
+  .hero h1{ font-size:1.15rem; } .hero p{ font-size:.76rem; }
+  .block-container{ padding:.6rem .5rem 3rem!important; }
+}
+footer{ visibility:hidden; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -470,6 +507,8 @@ with tab_week:
     else:
         ss = st.session_state
         ss.setdefault("week_anchor", date.today())
+        ss.setdefault("play_vid_week", None)
+        ss.setdefault("play_title_week", "")
 
         # 一鍵生成
         with st.container(border=True):
@@ -557,9 +596,10 @@ with tab_week:
                                 f"<div class='dish-mini'>{dish['title'][:26]}{flag}</div>"
                                 f"{cost_badge(dish.get('ingredients'))}</div>",
                                 unsafe_allow_html=True)
-                            st.link_button("📺 看影片",
-                                           f"https://www.youtube.com/watch?v={vid}",
-                                           use_container_width=True)
+                            if st.button("▶️ 播放", key=f"playw_{vid}",
+                                         use_container_width=True):
+                                ss.play_vid_week = vid
+                                ss.play_title_week = dish["title"]
                             with st.expander("🥬 食材"):
                                 if dish.get("inferred"):
                                     st.caption("⚠ 由菜名推測，非影片實際食材，請核對")
@@ -582,6 +622,12 @@ with tab_week:
         except Exception as e:
             st.error(f"餐表載入錯誤：{e}")
         st.session_state["_grid_cache"] = grid
+
+        if ss.get("play_vid_week"):
+            st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title_week[:50]}</div>",
+                        unsafe_allow_html=True)
+            st.video(f"https://www.youtube.com/watch?v={ss.play_vid_week}")
+            st.caption("點播放器右下角可全螢幕；點 YouTube 標誌可前往頻道。")
 
 
 # ================ 🛒 採買清單 ================
