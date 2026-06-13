@@ -2,12 +2,16 @@
 # Streamlit Cloud 會讀這個檔自動安裝。放在 repo 根目錄。
 
 streamlit
-anthropic        # Claude API,抽食材
-supabase         # 快取 recipes + 存 meal_plan 餐表
+pandas
+pyarrow          # 讀 PriceCatcher 官方物價 parquet
+anthropic        # Claude API，抽食材
+supabase         # 快取 recipes 抽取結果
 requests         # 呼叫 YouTube Data API
 
 # 想要可重現的環境，可改成釘版本，例如：
 #   streamlit==1.40.0
+#   pandas==2.2.3
+#   pyarrow==18.1.0
 #   anthropic==0.40.0
 #   supabase==2.10.0
 #   requests==2.32.3

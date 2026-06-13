@@ -1,199 +1,709 @@
+# -*- coding: utf-8 -*-
 """
-app_meal_planner.py
-===================
-「今天煮什麼?」反向排餐 UI。
-
-流程:① 找菜(搜尋→排入餐表,排入時自動抽食材並快取)
-      ② 一週餐表(七天 × 午/晚,可移除、可翻週)
-      ③ 一鍵生成分類購物清單(可勾選、可下載)
-
-慣例(沿用 Market-Sentinel):
-  - 不使用 nested st.columns
-  - 每個 render 區塊包 try/except
-  - 按鈕樣式用 .st-key-{key} button
-
-需要的 secrets(本機 .streamlit/secrets.toml + Streamlit Cloud 兩處都要):
-    YOUTUBE_API_KEY, ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_KEY
+🌸 今天煮什麼？— 亞庇家庭買菜煮飯小幫手（YouTube 反向版）
+首頁：官方市場行情月度報告 ｜ YouTube 找菜 ｜ 一週餐表 ｜ 採買清單 ｜ 花費總覽
+- 找菜：YouTube 搜尋 → 卡片式結果 → Dashboard 內嵌播放（可全螢幕）→ 排入餐表
+- 一週餐表：Supabase meal_plan，粉色日曆卡，🪄 一鍵生成
+- 採買清單：YouTube 抽取食材自動加總 + 估價 + WhatsApp 分享
+- 估價：以市場行情／海鮮價格做本機推估（標「估」）
 """
-
+import os
+import base64
+import functools
+import urllib.parse
+import urllib.request
+import tempfile
+import datetime
+import random
+from collections import defaultdict
 from datetime import date, timedelta
 
+import pandas as pd
 import streamlit as st
 from anthropic import Anthropic
 from supabase import create_client
 
+from recipes_data import (
+    RECIPES, SEAFOOD_PRICES, MARKET_TIPS, ELDERLY_TIPS,
+)
 import recipe_to_ingredients as R
 import meal_plan as MP
 
-st.set_page_config(page_title="今天煮什麼?", page_icon="🍳", layout="wide")
+st.set_page_config(page_title="今天煮什麼？亞庇買菜煮飯小幫手",
+                   page_icon="🌸", layout="wide")
+
+DAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+DAY_EMOJIS = ["🌷", "🌼", "🌺", "🌻", "🌹", "🌸", "💐"]
+IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images")
 
 
-# ── 連線(資源快取,不會每次 rerun 重建)──────────────────────────────────
+# ---------------------------------------------------------------- 連線
 @st.cache_resource
-def get_clients():
+def _get_clients():
     claude = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
     sb = create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
     return claude, sb
 
-
-claude, supabase = get_clients()
-YT_KEY = st.secrets["YOUTUBE_API_KEY"]
-
-
-# ── 按鈕樣式(.st-key-{key} pattern)──────────────────────────────────────
-st.markdown(
-    """
-    <style>
-      .st-key-do_search button   { background:#06b6d4; color:#fff; font-weight:700; }
-      .st-key-gen_shopping button { background:#059669; color:#fff; font-weight:700; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-
-# ── session state ────────────────────────────────────────────────────────
-ss = st.session_state
-ss.setdefault("cards", [])
-ss.setdefault("target_date", date.today())
-ss.setdefault("target_slot", "晚")
-ss.setdefault("week_anchor", date.today())
-ss.setdefault("show_shopping", False)
-
-
-st.title("🍳 今天煮什麼?")
-st.caption("從 YouTube 找菜 → 自動抽食材 → 一週排餐 → 分類購物清單")
-
-
-# ══════════════════════════════════════════════════════════════════════════
-# ① 找菜 + 排入餐表
-# ══════════════════════════════════════════════════════════════════════════
-st.subheader("① 找菜")
-
-c1, c2, c3 = st.columns([2, 1, 3])  # 頂層 columns,非 nested
-with c1:
-    ss.target_date = st.date_input("排入日期", value=ss.target_date)
-with c2:
-    ss.target_slot = st.radio(
-        "時段", MP.SLOTS, index=MP.SLOTS.index(ss.target_slot), horizontal=True
-    )
-with c3:
-    query = st.text_input("想煮什麼?(輸入菜名)", placeholder="例:麻婆豆腐")
-
-if st.button("🔍 搜尋", key="do_search"):
-    if query.strip():
-        with st.spinner("搜尋中…(花 100 units)"):
-            try:
-                ss.cards = R.search_dishes(query.strip(), YT_KEY)
-                ss.show_shopping = False
-            except Exception as e:
-                st.error(f"搜尋失敗:{e}")
-                ss.cards = []
-    else:
-        st.warning("請先輸入菜名。")
-
-# 渲染搜尋結果卡片
-if ss.cards:
-    try:
-        cols = st.columns(3)  # 頂層
-        for i, card in enumerate(ss.cards):
-            with cols[i % 3]:
-                if card.get("thumbnail_url"):
-                    st.image(card["thumbnail_url"], use_container_width=True)
-                st.markdown(f"**{card['title'][:46]}**")
-                st.caption(f"📺 {card['channel']}")
-                if st.button("➕ 排入此餐", key=f"add_{card['video_id']}"):
-                    with st.spinner("抽取食材中…(首次會打 1 unit + Claude,之後走快取)"):
-                        try:
-                            recipe = R.get_or_build_recipe(
-                                card,
-                                yt_api_key=YT_KEY,
-                                anthropic_client=claude,
-                                supabase=supabase,
-                            )
-                            MP.add_to_plan(
-                                supabase, ss.target_date, ss.target_slot, card["video_id"]
-                            )
-                            tag = " ⚠由菜名推測,請核對" if recipe.get("inferred") else ""
-                            st.success(
-                                f"已排入 {ss.target_date} {ss.target_slot}:"
-                                f"{recipe['title'][:20]}{tag}"
-                            )
-                        except Exception as e:
-                            st.error(f"排入失敗:{e}")
-    except Exception as e:
-        st.error(f"卡片渲染錯誤:{e}")
-
-st.divider()
-
-
-# ══════════════════════════════════════════════════════════════════════════
-# ② 一週餐表
-# ══════════════════════════════════════════════════════════════════════════
-st.subheader("② 一週餐表")
-
-nav1, nav2, nav3 = st.columns([1, 2, 1])  # 頂層
-with nav1:
-    if st.button("← 上一週"):
-        ss.week_anchor -= timedelta(days=7)
-with nav3:
-    if st.button("下一週 →"):
-        ss.week_anchor += timedelta(days=7)
-mon = MP.week_start(ss.week_anchor)
-with nav2:
-    st.markdown(f"**{mon} ～ {mon + timedelta(days=6)}**")
-
-grid = {}
 try:
-    grid = MP.get_week_plan(supabase, ss.week_anchor)
-    day_cols = st.columns(7)  # 頂層
-    week_names = ["一", "二", "三", "四", "五", "六", "日"]
-    for d in range(7):
-        day = mon + timedelta(days=d)
-        with day_cols[d]:
-            st.markdown(f"**週{week_names[d]}**　{day.month}/{day.day}")
-            for slot in MP.SLOTS:
-                st.caption(f"— {slot} —")
-                dishes = grid.get((str(day), slot), [])
-                if not dishes:
-                    st.caption("　·")
-                for dish in dishes:
-                    if dish.get("thumbnail_url"):
-                        st.image(dish["thumbnail_url"], use_container_width=True)
-                    flag = " ⚠" if dish.get("inferred") else ""
-                    st.caption(dish["title"][:22] + flag)
-                    if st.button("✕ 移除", key=f"rm_{day}_{slot}_{dish['video_id']}"):
-                        MP.remove_from_plan(supabase, day, slot, dish["video_id"])
-                        st.rerun()
-except Exception as e:
-    st.error(f"餐表載入錯誤:{e}")
-
-st.divider()
+    claude, supabase = _get_clients()
+    YT_KEY = st.secrets["YOUTUBE_API_KEY"]
+    CLIENTS_OK = True
+except Exception:
+    claude = supabase = YT_KEY = None
+    CLIENTS_OK = False
 
 
-# ══════════════════════════════════════════════════════════════════════════
-# ③ 購物清單
-# ══════════════════════════════════════════════════════════════════════════
-st.subheader("③ 購物清單")
+# ---------------------------------------------------------------- 主題 CSS
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap');
+html, body, [class*="css"] { font-family: 'Noto Sans TC', sans-serif; }
+.stApp { background: linear-gradient(180deg, #FDF4F6 0%, #FBEFF2 45%, #F9EAEF 100%); }
 
-if st.button("🛒 生成本週購物清單", key="gen_shopping"):
-    ss.show_shopping = True
+.hero {
+  background: linear-gradient(120deg, #C2698A 0%, #B45A78 55%, #9C4D68 100%);
+  border-radius: 24px; padding: 26px 34px; color: #FFF8F9;
+  box-shadow: 0 10px 30px rgba(180, 90, 120, 0.25); margin-bottom: 10px;
+}
+.hero h1 { margin: 0; font-size: 1.9rem; font-weight: 900; letter-spacing: 1px; }
+.hero p  { margin: 6px 0 0 0; font-size: 0.95rem; opacity: 0.92; }
+.hero .gold { color: #F4D9A6; font-weight: 700; }
 
-if ss.show_shopping:
+.card {
+  background: #FFFFFF; border-radius: 20px; padding: 18px 20px;
+  box-shadow: 0 6px 18px rgba(180, 90, 120, 0.10);
+  border: 1px solid #F3DCE3; margin-bottom: 14px;
+}
+div[data-testid="stVerticalBlockBorderWrapper"] {
+  background: #FFFFFF; border: 1.5px solid #F0D5DD !important;
+  border-radius: 20px; box-shadow: 0 5px 16px rgba(180,90,120,.10);
+  padding: 4px 8px;
+}
+.meal-tag { display:inline-block; font-size:0.72rem; font-weight:700;
+  padding:2px 10px; border-radius:999px; margin-bottom:6px; }
+.tag-lunch  { background:#FCEEDF; color:#A6731F; }
+.tag-dinner { background:#EFE0F0; color:#7B4E86; }
+.meal-name { font-size:1.0rem; font-weight:700; color:#6E3B4E; line-height:1.4; }
+.cost-badge { display:inline-block; background:#FBE9EE; color:#B4456A;
+  font-weight:800; font-size:0.86rem; border-radius:10px; padding:3px 10px; margin-top:6px; }
+.chip { display:inline-block; background:#F7F0EA; color:#8A6A52;
+  border-radius:999px; font-size:0.72rem; padding:2px 9px; margin:2px 2px; }
+.note { font-size:0.78rem; color:#9A7C5B; background:#FDF7EC;
+  border-left:3px solid #DDB877; border-radius:6px; padding:5px 9px; margin-top:7px; }
+.section-title { font-size:1.15rem; font-weight:900; color:#8E4560; margin:4px 0 10px 0; }
+
+.stats-row { display:flex; flex-wrap:wrap; gap:10px; margin:4px 0 10px 0; }
+.stat { background:#FFFFFF; border-radius:18px; text-align:center; flex:1 1 160px;
+  padding:14px 8px; border:1px solid #F3DCE3; box-shadow:0 4px 14px rgba(180,90,120,.10); }
+.stat .v { font-size:1.35rem; font-weight:900; color:#B4456A; }
+.stat .l { font-size:0.8rem; color:#A0728B; margin-top:2px; }
+
+.stButton > button { border-radius:999px; border:1.5px solid #E5B9C9;
+  color:#8E4560; background:#FFF6F8; font-weight:700; min-height:2.5rem; }
+.stButton > button:hover { border-color:#B4456A; color:#B4456A; background:#FDEDF2; }
+div[data-testid="stButton"] > button[kind="primary"] {
+  background: linear-gradient(120deg, #C2698A, #A8546F); color:#FFF; border:none;
+  font-size:1.05rem; font-weight:900; padding:0.6rem 1.4rem;
+  box-shadow:0 6px 16px rgba(180,90,120,.35); }
+
+.stTabs [data-baseweb="tab-list"] { gap:6px; overflow-x:auto; flex-wrap:nowrap;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch; padding-bottom:4px; }
+.stTabs [data-baseweb="tab-list"]::-webkit-scrollbar { display:none; }
+.stTabs [data-baseweb="tab"] { background:#FFF6F8; border-radius:999px; padding:6px 16px;
+  border:1px solid #F0D5DD; color:#8E4560; font-weight:700; white-space:nowrap; flex-shrink:0; }
+.stTabs [aria-selected="true"] { background:linear-gradient(120deg,#C2698A,#A8546F)!important;
+  color:#FFF!important; border:none!important; }
+[data-testid="stDataFrame"] { border-radius:14px; overflow:hidden; }
+
+.day-card { background:#FFFFFF; border-radius:20px; border:1.5px solid #F0D5DD;
+  box-shadow:0 5px 16px rgba(180,90,120,.10); padding:14px 14px 10px 14px; margin-bottom:8px; }
+.day-head { display:flex; justify-content:space-between; align-items:center;
+  font-weight:900; color:#8E4560; font-size:1.05rem; margin-bottom:8px; }
+.day-cost { background:#FBE9EE; color:#B4456A; font-size:.76rem; font-weight:800;
+  border-radius:999px; padding:2px 10px; white-space:nowrap; }
+.day-divider { border-top:1.5px dashed #F0D5DD; margin:10px 0 8px 0; }
+
+.pkg-card { background:#FFFFFF; border:1.5px solid #F0D5DD; border-radius:18px;
+  padding:10px 10px 6px 10px; text-align:center;
+  box-shadow:0 4px 12px rgba(180,90,120,.08); margin-bottom:6px; }
+.pkg-title { font-weight:800; color:#8E4560; margin-top:7px; font-size:.92rem; line-height:1.35;
+  min-height:2.5em; }
+.pkg-desc { font-size:.74rem; color:#A0728B; margin-top:2px; }
+
+.yt-thumb { width:100%; height:120px; object-fit:cover; border-radius:12px; display:block; }
+.slot-label { font-size:.8rem; font-weight:800; color:#A8546F; margin:6px 0 2px; }
+.dish-mini { font-size:.82rem; color:#6E3B4E; font-weight:600; line-height:1.3;
+  min-height:2.4em; margin-top:3px; }
+.warn-flag { color:#C77; font-size:.72rem; }
+
+.emoji-hero { font-size:2.6rem; text-align:center; background:#FBEFF2;
+  border-radius:14px; padding:10px 0; margin-bottom:8px; }
+
+@media (max-width: 1024px) {
+  [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: 0.7rem !important; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    flex: 1 1 45% !important; min-width: 45% !important; width: auto !important; }
+}
+@media (max-width: 640px) {
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"],
+  [data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    flex: 1 1 100% !important; min-width: 100% !important; }
+  .block-container { padding: 0.9rem 0.7rem !important; }
+  .hero h1 { font-size: 1.35rem; }
+}
+footer { visibility: hidden; }
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------- 估價（本機推估）
+# 以「每道菜該食材的常見份量價」粗估，避開調味料；標示「估」。
+PRICE_PORTIONS = [
+    (("蝦", "明蝦", "白蝦", "草蝦"), 14),
+    (("蟹", "螃蟹"), 18),
+    (("牛",), 16),
+    (("鴨",), 13),
+    (("豬", "排骨", "五花"), 11),
+    (("魚", "馬鮫", "甘望", "石斑", "紅鰽", "鱸", "鯧", "鯛"), 12),
+    (("雞",), 9),
+    (("香菇", "蘑菇", "金針菇", "杏鮑菇", "草菇", "菇"), 4),
+    (("豆腐", "豆干", "豆包", "豆皮"), 3),
+    (("蛋",), 2),
+    (("番茄", "西紅柿"), 2),
+    (("洋蔥",), 2),
+    (("馬鈴薯", "土豆", "薯", "蘿蔔"), 2),
+    (("青菜", "菜心", "白菜", "芥蘭", "空心菜", "菠菜", "花椰", "西蘭花",
+      "高麗", "包菜", "生菜", "莧菜", "油菜", "青江", "豆芽", "長豆"), 3),
+    (("麵", "河粉", "米粉", "烏冬", "粄條", "板麵"), 3),
+    (("米", "飯", "糯米"), 2),
+    (("咖哩", "椰漿", "椰奶"), 3),
+    (("辣椒", "紅椒", "青椒", "彩椒", "甜椒"), 2),
+    (("蒜", "薑", "蔥", "香菜", "九層塔", "羅勒"), 1),
+]
+SEASONING_FREE = ("鹽", "糖", "油", "醬油", "胡椒", "醋", "味精", "料酒", "米酒",
+                  "水", "太白粉", "澱粉", "蠔油", "魚露", "醬", "酒", "粉")
+
+
+def estimate_dish_cost(ingredients):
+    """回傳 (low, high, matched, counted) 或 None。"""
+    total, matched, counted = 0.0, 0, 0
+    for ing in ingredients or []:
+        name = (ing.get("name_norm") or ing.get("name") or "")
+        if any(s in name for s in SEASONING_FREE):
+            continue
+        counted += 1
+        for kws, rm in PRICE_PORTIONS:
+            if any(k in name for k in kws):
+                total += rm
+                matched += 1
+                break
+    if matched == 0:
+        return None
+    return int(round(total * 0.9)), int(round(total * 1.1)), matched, counted
+
+
+def cost_badge(ingredients):
+    est = estimate_dish_cost(ingredients)
+    if not est:
+        return "<span class='cost-badge'>💰 RM —</span>"
+    lo, hi, _m, _c = est
+    return f"<span class='cost-badge'>💰 估 RM {lo}–{hi}</span>"
+
+
+def dish_mid_cost(ingredients):
+    est = estimate_dish_cost(ingredients)
+    if not est:
+        return 0
+    lo, hi, _m, _c = est
+    return (lo + hi) / 2
+
+
+# ---------------------------------------------------------------- 樂齡用：份量縮放
+def people_factor(n):
+    return {2: 0.8, 3: 1.0, 4: 1.15, 5: 1.35, 6: 1.5}.get(n, 1.0)
+
+def scaled_cost(recipe, n):
+    f = people_factor(n)
+    return int(round(recipe["cost"][0] * f)), int(round(recipe["cost"][1] * f))
+
+
+@functools.lru_cache(maxsize=64)
+def _img_b64(path):
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
+
+
+# ---------------------------------------------------------------- 官方物價 PriceCatcher
+PC_BASE = "https://storage.data.gov.my/pricecatcher"
+
+OFFICIAL_ITEMS = [
+    ("🐟 甘望魚 Ikan Kembung", ["IKAN KEMBUNG"]),
+    ("🐠 馬鮫魚 Ikan Tenggiri", ["IKAN TENGGIRI"]),
+    ("🦐 蝦 Udang", ["UDANG"]),
+    ("🐡 紅鰽魚 / 石斑", ["IKAN MERAH", "KERAPU"]),
+    ("🍗 雞肉 Ayam", ["AYAM STANDARD", "AYAM SUPER", "AYAM BERSIH"]),
+    ("🥚 雞蛋 Telur", ["TELUR AYAM"]),
+    ("🍅 番茄 Tomato", ["TOMATO"]),
+    ("🧅 洋蔥 Bawang", ["BAWANG BESAR"]),
+    ("🥬 菜心 / 小白菜 Sawi", ["SAWI"]),
+    ("🌶️ 辣椒 Cili", ["CILI"]),
+]
+
+def _read_parquet_url(url):
+    fn = os.path.join(tempfile.gettempdir(), os.path.basename(url))
+    if not os.path.exists(fn):
+        urllib.request.urlretrieve(url, fn)
+    return pd.read_parquet(fn)
+
+@st.cache_data(ttl=60 * 60 * 24, show_spinner=False)
+def fetch_official_mom():
+    premise = _read_parquet_url(f"{PC_BASE}/lookup_premise.parquet")
+    items = _read_parquet_url(f"{PC_BASE}/lookup_item.parquet")
+    kk = set(premise.loc[
+        premise["district"].astype(str).str.contains("Kota Kinabalu", case=False, na=False),
+        "premise_code"])
+
+    def prep(m):
+        df = _read_parquet_url(f"{PC_BASE}/pricecatcher_{m}.parquet")
+        df = df[df["premise_code"].isin(kk)]
+        df = df[df["price"] > 0]
+        df = df.merge(items[["item_code", "item", "unit"]], on="item_code", how="left")
+        df["item"] = df["item"].astype(str).str.upper()
+        return df
+
+    today = datetime.date.today()
+    first = today.replace(day=1)
+    m_now = today.strftime("%Y-%m")
+    m_prev = (first - datetime.timedelta(days=1)).strftime("%Y-%m")
+    m_prev2 = ((first - datetime.timedelta(days=1)).replace(day=1)
+               - datetime.timedelta(days=1)).strftime("%Y-%m")
+    pair = None
+    for cm, pm in ((m_now, m_prev), (m_prev, m_prev2)):
+        try:
+            pair = (cm, prep(cm), pm, prep(pm))
+            break
+        except Exception:
+            continue
+    if pair is None:
+        raise RuntimeError("PriceCatcher 下載失敗")
+    cm, cur, pm, prev = pair
+    rows = []
+    for label, kws in OFFICIAL_ITEMS:
+        pat = "|".join(kws)
+        c = cur[cur["item"].str.contains(pat, na=False)]
+        p = prev[prev["item"].str.contains(pat, na=False)]
+        if len(c) < 3 or len(p) < 3:
+            continue
+        mc, mp = float(c["price"].median()), float(p["price"].median())
+        pct = (mc - mp) / mp * 100 if mp else 0.0
+        arrow = "🔺" if pct > 0.5 else ("🔻" if pct < -0.5 else "➖")
+        unit = c["unit"].mode().iloc[0] if len(c["unit"].mode()) else "-"
+        rows.append({"品項": label,
+                     f"上月 ({pm})": round(mp, 2),
+                     f"本月 ({cm})": round(mc, 2),
+                     "變化": f"{arrow} {pct:+.1f}%",
+                     "單位": unit})
+    return pd.DataFrame(rows), {"cur": cm, "prev": pm, "premises": int(len(kk))}
+
+
+# ---------------------------------------------------------------- 找菜池（一鍵生成用）
+LUNCH_NAMES = [r["name"] for r in RECIPES if "lunch" in r["meal"]]
+DINNER_NAMES = [r["name"] for r in RECIPES if "dinner" in r["meal"]]
+
+
+# ---------------------------------------------------------------- 頁首
+st.markdown("""
+<div class='hero'>
+  <div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px'>
+    <h1>🌸 今天煮什麼？</h1>
+    <span style='background:rgba(255,248,249,.18); border:1px solid rgba(244,217,166,.55);
+                 color:#F4D9A6; font-size:.78rem; font-weight:700; letter-spacing:.5px;
+                 border-radius:999px; padding:4px 14px; white-space:nowrap'>
+      ✦ David Lau Cooking Market Project</span>
+  </div>
+  <p>亞庇家庭買菜煮飯小幫手 ｜ <span class='gold'>麗都市場 Lido Market</span> ＆
+     <span class='gold'>生源 Damai Fresh Market</span> ｜ YouTube 找菜・一鍵排餐・採買清單 💕</p>
+</div>
+""", unsafe_allow_html=True)
+
+if not CLIENTS_OK:
+    st.error("⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
+             "市場行情與樂齡專區仍可使用，但「找菜／餐表／採買清單」需要設定 Secrets。")
+
+tab_market, tab_find, tab_week, tab_shop, tab_budget, tab_elderly, tab_tips = st.tabs(
+    ["📊 市場行情", "🔍 找菜", "📅 一週餐表", "🛒 採買清單",
+     "💰 花費總覽", "👵 樂齡專區", "💡 小貼士"])
+
+
+# ================ 📊 市場行情 ================
+with tab_market:
+    st.markdown("<div class='section-title'>📊 亞庇官方物價月報（上月 vs 本月）</div>",
+                unsafe_allow_html=True)
     try:
+        with st.spinner("正在載入官方數據（首次約 20–60 秒，之後全站共用快取）…"):
+            otable, ometa = fetch_official_mom()
+        if len(otable):
+            ups = int(otable["變化"].str.startswith("🔺").sum())
+            downs = int(otable["變化"].str.startswith("🔻").sum())
+            flat = len(otable) - ups - downs
+            st.markdown(f"""
+            <div class='stats-row'>
+              <div class='stat'><div class='v'>🔺 {ups} 項</div><div class='l'>本月變貴</div></div>
+              <div class='stat'><div class='v'>🔻 {downs} 項</div><div class='l'>本月變便宜</div></div>
+              <div class='stat'><div class='v'>➖ {flat} 項</div><div class='l'>大致持平</div></div>
+              <div class='stat'><div class='v'>{ometa['premises']} 家</div><div class='l'>KK 採價店家</div></div>
+            </div>""", unsafe_allow_html=True)
+            st.dataframe(otable, use_container_width=True, hide_index=True)
+            st.caption(
+                f"資料來源：PriceCatcher（馬來西亞 KPDN + DOSM，data.gov.my，CC BY 4.0）｜"
+                f"比較月份 {ometa['prev']} → {ometa['cur']}，取 Kota Kinabalu 店家當月中位價。"
+                f"官方採價以超市與零售店為主，濕市場價格可能略有差異，僅供參考。")
+        else:
+            st.info("官方數據已下載，但本期抓不到亞庇的相關品項，請過幾天再看。")
+    except Exception:
+        st.warning("📡 官方月度數據暫時無法載入（來源網站忙碌），請稍後重新整理頁面。"
+                   "下方為麗都市場參考行情。")
+
+    st.markdown("<div class='section-title'>🐟 麗都市場海鮮參考行情（RM / 公斤）</div>",
+                unsafe_allow_html=True)
+    _mkt = [("market_tenggiri.jpg", "馬鮫魚 Ikan Tenggiri"),
+            ("market_kembung.jpg", "甘望魚 Ikan Kembung"),
+            ("market_udang.jpg", "本地白蝦 Udang"),
+            ("market_merah.jpg", "紅鰽魚 / 石斑")]
+    if any(os.path.exists(os.path.join(IMG_DIR, f)) for f, _ in _mkt):
+        mcols = st.columns(4)
+        for col, (fn, cap) in zip(mcols, _mkt):
+            p = os.path.join(IMG_DIR, fn)
+            if os.path.exists(p):
+                col.image(p, caption=cap, use_container_width=True)
+    sf = pd.DataFrame([{"海鮮": f"{e} {zh}", "馬來名稱": my,
+                        "價格 (RM/kg)": f"RM {a} – {b}", "特點 / 料理方式": note}
+                       for zh, my, e, a, b, note in SEAFOOD_PRICES])
+    st.dataframe(sf, use_container_width=True, hide_index=True)
+    st.markdown("<div class='card'><b style='color:#8E4560'>🧺 買海鮮小貼士</b><br>" +
+                "<br>".join(MARKET_TIPS[:5]) + "</div>", unsafe_allow_html=True)
+
+
+# ================ 🔍 找菜（YouTube 搜尋 → 卡片 → 內嵌播放 → 排入餐表） ================
+with tab_find:
+    st.markdown("<div class='section-title'>🔍 想煮什麼？YouTube 上找，找到就排進餐表</div>",
+                unsafe_allow_html=True)
+
+    if not CLIENTS_OK:
+        st.info("此功能需要 ANTHROPIC / SUPABASE / YOUTUBE 三把金鑰，請先到 Secrets 設定。")
+    else:
+        ss = st.session_state
+        ss.setdefault("find_cards", [])
+        ss.setdefault("find_date", date.today())
+        ss.setdefault("find_slot", "晚")
+        ss.setdefault("play_vid", None)
+        ss.setdefault("play_title", "")
+
+        c1, c2, c3 = st.columns([1.4, 1, 2.2])
+        with c1:
+            ss.find_date = st.date_input("排入日期", value=ss.find_date, key="find_date_inp")
+        with c2:
+            ss.find_slot = st.radio("時段", MP.SLOTS,
+                                    index=MP.SLOTS.index(ss.find_slot), horizontal=True)
+        with c3:
+            query = st.text_input("輸入菜名", placeholder="例：麻婆豆腐、咖哩雞、番茄炒蛋")
+
+        if st.button("🔍 搜尋", key="find_search", type="primary"):
+            if query.strip():
+                with st.spinner("搜尋中…"):
+                    try:
+                        ss.find_cards = R.search_dishes(query.strip(), YT_KEY)
+                        ss.play_vid = None
+                    except Exception as e:
+                        st.error(f"搜尋失敗：{e}")
+                        ss.find_cards = []
+            else:
+                st.warning("先輸入菜名再搜尋喔 🌸")
+
+        if ss.find_cards:
+            cols = st.columns(3)
+            for i, card in enumerate(ss.find_cards):
+                with cols[i % 3]:
+                    thumb = card.get("thumbnail_url")
+                    visual = (f"<img class='yt-thumb' src='{thumb}'/>" if thumb
+                              else "<div class='emoji-hero'>🍳</div>")
+                    st.markdown(
+                        f"<div class='pkg-card'>{visual}"
+                        f"<div class='pkg-title'>{card['title'][:48]}</div>"
+                        f"<div class='pkg-desc'>📺 {card['channel']}</div></div>",
+                        unsafe_allow_html=True)
+                    if st.button("▶️ 播放", key=f"play_{card['video_id']}",
+                                 use_container_width=True):
+                        ss.play_vid = card["video_id"]
+                        ss.play_title = card["title"]
+                    if st.button("➕ 排入餐表", key=f"add_{card['video_id']}",
+                                 use_container_width=True):
+                        with st.spinner("抽取食材中…（首次會抽取，之後走快取）"):
+                            try:
+                                rec = R.get_or_build_recipe(
+                                    card, yt_api_key=YT_KEY,
+                                    anthropic_client=claude, supabase=supabase)
+                                MP.add_to_plan(supabase, ss.find_date,
+                                               ss.find_slot, card["video_id"])
+                                flag = "（⚠ 由菜名推測，請核對）" if rec.get("inferred") else ""
+                                st.success(f"已排入 {ss.find_date} {ss.find_slot}："
+                                           f"{rec['title'][:18]}{flag}")
+                            except Exception as e:
+                                st.error(f"排入失敗：{e}")
+
+        # 內嵌播放器（全寬、可全螢幕）
+        if ss.play_vid:
+            st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title[:50]}</div>",
+                        unsafe_allow_html=True)
+            st.video(f"https://www.youtube.com/watch?v={ss.play_vid}")
+            st.caption("點播放器右下角可全螢幕；點 YouTube 標誌可前往頻道。")
+
+
+# ================ 📅 一週餐表 ================
+with tab_week:
+    st.markdown("<div class='section-title'>📅 一週餐表（粉色日曆卡）</div>",
+                unsafe_allow_html=True)
+
+    if not CLIENTS_OK:
+        st.info("此功能需要 Secrets 設定。")
+    else:
+        ss = st.session_state
+        ss.setdefault("week_anchor", date.today())
+
+        # 一鍵生成
+        with st.container(border=True):
+            st.markdown("<b style='color:#8E4560'>🪄 一鍵生成：自動從家常菜池搜 YouTube 填滿餐表</b>",
+                        unsafe_allow_html=True)
+            g1, g2 = st.columns([1, 1])
+            with g1:
+                gen_days = st.slider("要排幾天", 1, 7, 3, key="gen_days")
+            with g2:
+                gen_slots = st.multiselect("時段", MP.SLOTS, default=MP.SLOTS, key="gen_slots")
+            st.caption(f"預估耗用 YouTube 額度約 {gen_days * max(1, len(gen_slots)) * 100} units"
+                       f"（每道菜 100u，已抽取過的會走快取）。")
+            if st.button("🪄 一鍵生成本週餐表", key="gen_week", type="primary"):
+                if not gen_slots:
+                    st.warning("至少選一個時段。")
+                else:
+                    mon = MP.week_start(ss.week_anchor)
+                    prog = st.progress(0.0, text="開始生成…")
+                    jobs = [(d, s) for d in range(gen_days) for s in gen_slots]
+                    done = 0
+                    for d, slot in jobs:
+                        day = mon + timedelta(days=d)
+                        pool = LUNCH_NAMES if slot == "午" else DINNER_NAMES
+                        name = random.choice(pool) if pool else "家常菜"
+                        prog.progress(done / len(jobs), text=f"搜尋：{name}")
+                        try:
+                            cards = R.search_dishes(name, YT_KEY, max_results=1)
+                            if cards:
+                                rec = R.get_or_build_recipe(
+                                    cards[0], yt_api_key=YT_KEY,
+                                    anthropic_client=claude, supabase=supabase)
+                                MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
+                        except Exception:
+                            pass
+                        done += 1
+                    prog.progress(1.0, text="完成！")
+                    st.success("已生成，往下看餐表 👇")
+                    st.balloons()
+
+        nav1, nav2, nav3 = st.columns([1, 2, 1])
+        with nav1:
+            if st.button("← 上一週"):
+                ss.week_anchor -= timedelta(days=7)
+        with nav3:
+            if st.button("下一週 →"):
+                ss.week_anchor += timedelta(days=7)
+        mon = MP.week_start(ss.week_anchor)
+        with nav2:
+            st.markdown(f"<div style='text-align:center;font-weight:900;color:#8E4560'>"
+                        f"{mon} ～ {mon + timedelta(days=6)}</div>", unsafe_allow_html=True)
+
+        grid = {}
+        try:
+            grid = MP.get_week_plan(supabase, ss.week_anchor)
+            week_names = ["一", "二", "三", "四", "五", "六", "日"]
+            day_cols = st.columns(7)
+            for d in range(7):
+                day = mon + timedelta(days=d)
+                with day_cols[d]:
+                    st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[d]} 週{week_names[d]}</span>"
+                                f"<span class='day-cost'>{day.month}/{day.day}</span></div>",
+                                unsafe_allow_html=True)
+                    for slot in MP.SLOTS:
+                        st.markdown(f"<div class='slot-label'>"
+                                    f"{'🍱 午餐' if slot == '午' else '🌙 晚餐'}</div>",
+                                    unsafe_allow_html=True)
+                        dishes = grid.get((str(day), slot), [])
+                        if not dishes:
+                            st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
+                                        unsafe_allow_html=True)
+                        for dish in dishes:
+                            thumb = dish.get("thumbnail_url")
+                            visual = (f"<img class='yt-thumb' style='height:78px' src='{thumb}'/>"
+                                      if thumb else "")
+                            flag = " <span class='warn-flag'>⚠</span>" if dish.get("inferred") else ""
+                            st.markdown(
+                                f"<div class='day-card' style='padding:8px'>{visual}"
+                                f"<div class='dish-mini'>{dish['title'][:26]}{flag}</div>"
+                                f"{cost_badge(dish.get('ingredients'))}</div>",
+                                unsafe_allow_html=True)
+                            if st.button("✕ 移除", key=f"rm_{day}_{slot}_{dish['video_id']}",
+                                         use_container_width=True):
+                                MP.remove_from_plan(supabase, day, slot, dish["video_id"])
+                                st.rerun()
+        except Exception as e:
+            st.error(f"餐表載入錯誤：{e}")
+        st.session_state["_grid_cache"] = grid
+
+
+# ================ 🛒 採買清單 ================
+with tab_shop:
+    st.markdown("<div class='section-title'>🛒 本週採買清單（YouTube 食材自動加總）</div>",
+                unsafe_allow_html=True)
+    if not CLIENTS_OK:
+        st.info("此功能需要 Secrets 設定。")
+    else:
+        grid = st.session_state.get("_grid_cache")
+        if grid is None:
+            try:
+                grid = MP.get_week_plan(supabase, st.session_state.get("week_anchor", date.today()))
+            except Exception:
+                grid = {}
         recipes = MP.collect_week_recipes(grid)
         if not recipes:
-            st.info("這週還沒排菜。")
+            st.info("本週還沒排菜，先去「📅 一週餐表」排幾道吧 🌸")
         else:
-            shopping = R.build_shopping_list(recipes)
-            export_lines = []
-            for cat, items in shopping.items():
-                st.markdown(f"### {cat}")
-                for it in items:
-                    label = f"{it['name']} — {it['amount']}"
-                    st.checkbox(label, key=f"buy_{cat}_{it['name']}")
-                    export_lines.append(f"[ ] {label}　({'、'.join(it['from'])})")
-            txt = f"本週購物清單（{mon} ～ {mon + timedelta(days=6)}）\n\n" + "\n".join(export_lines)
-            st.download_button("📄 下載清單(.txt)", txt, file_name="shopping_list.txt")
-    except Exception as e:
-        st.error(f"購物清單錯誤:{e}")
+            try:
+                shopping = R.build_shopping_list(recipes)
+                total_lo = sum(estimate_dish_cost(r.get("ingredients"))[0]
+                               for r in recipes if estimate_dish_cost(r.get("ingredients")))
+                total_hi = sum(estimate_dish_cost(r.get("ingredients"))[1]
+                               for r in recipes if estimate_dish_cost(r.get("ingredients")))
+                st.markdown(f"<div class='card'>🧮 本週估計買菜費："
+                            f"<b style='color:#B4456A'>估 RM {total_lo} – {total_hi}</b>"
+                            f"（{len(recipes)} 餐，依市場行情粗估，未含米油鹽等常備品）</div>",
+                            unsafe_allow_html=True)
+                cat_emojis = {"蔬菜": "🥬", "肉類": "🍗", "海鮮": "🐟", "蛋豆製品": "🥚",
+                              "調味料": "🧄", "乾貨雜貨": "🛍️", "其他": "🧺"}
+                cols = st.columns(3)
+                lines = ["🌸 本週採買清單", f"估計買菜費：RM {total_lo} – {total_hi}", ""]
+                idx = 0
+                for cat, items in shopping.items():
+                    with cols[idx % 3]:
+                        items_html = "".join(
+                            f"<div style='padding:4px 0;border-bottom:1px dashed #F0D5DD;"
+                            f"display:flex;justify-content:space-between'>"
+                            f"<span>☐ {it['name']}</span>"
+                            f"<b style='color:#B4456A'>{it['amount']}</b></div>"
+                            for it in items)
+                        st.markdown(f"<div class='card'><b style='color:#8E4560'>"
+                                    f"{cat_emojis.get(cat, '🛍️')} {cat}</b><br>{items_html}</div>",
+                                    unsafe_allow_html=True)
+                    lines.append(f"【{cat}】")
+                    lines += [f"  □ {it['name']}  {it['amount']}" for it in items]
+                    lines.append("")
+                    idx += 1
+                lines += ["—" * 18] + MARKET_TIPS[:5]
+                text = "\n".join(lines)
+                dl1, dl2 = st.columns(2)
+                with dl1:
+                    st.download_button("⬇️ 下載採買清單（帶去市場）", text,
+                                       file_name="本週採買清單.txt", use_container_width=True)
+                with dl2:
+                    _wa = text if len(text) <= 1500 else text[:1500] + "\n…"
+                    st.link_button("💬 用 WhatsApp 分享清單",
+                                   "https://wa.me/?text=" + urllib.parse.quote(_wa),
+                                   use_container_width=True)
+            except Exception as e:
+                st.error(f"採買清單錯誤：{e}")
+
+
+# ================ 💰 花費總覽 ================
+with tab_budget:
+    st.markdown("<div class='section-title'>💰 本週每日餐費估算（依市場行情粗估）</div>",
+                unsafe_allow_html=True)
+    if not CLIENTS_OK:
+        st.info("此功能需要 Secrets 設定。")
+    else:
+        grid = st.session_state.get("_grid_cache")
+        if grid is None:
+            try:
+                grid = MP.get_week_plan(supabase, st.session_state.get("week_anchor", date.today()))
+            except Exception:
+                grid = {}
+        if not grid:
+            st.info("本週還沒排菜。")
+        else:
+            mon = MP.week_start(st.session_state.get("week_anchor", date.today()))
+            week_names = ["一", "二", "三", "四", "五", "六", "日"]
+            rows = []
+            for d in range(7):
+                day = mon + timedelta(days=d)
+                lunch = grid.get((str(day), "午"), [])
+                dinner = grid.get((str(day), "晚"), [])
+                lc = sum(dish_mid_cost(x.get("ingredients")) for x in lunch)
+                dc = sum(dish_mid_cost(x.get("ingredients")) for x in dinner)
+                rows.append({"星期": f"週{week_names[d]}",
+                             "午餐": "、".join(x["title"][:10] for x in lunch) or "—",
+                             "晚餐": "、".join(x["title"][:10] for x in dinner) or "—",
+                             "當日估費": round(lc + dc)})
+            df = pd.DataFrame(rows)
+            b1, b2 = st.columns([1.3, 1])
+            with b1:
+                st.dataframe(df[["星期", "午餐", "晚餐", "當日估費"]],
+                             use_container_width=True, hide_index=True)
+            with b2:
+                chart_df = df.set_index("星期")[["當日估費"]].rename(columns={"當日估費": "RM"})
+                st.bar_chart(chart_df, color="#C2698A")
+                wk = int(df["當日估費"].sum())
+                avg = df["當日估費"].mean()
+                st.markdown(f"<div class='card'>📌 本週估計合計約 <b style='color:#B4456A'>RM {wk}</b>，"
+                            f"平均每天約 <b style='color:#B4456A'>RM {avg:.0f}</b>"
+                            f"（粗估，未含米油鹽等常備品）</div>", unsafe_allow_html=True)
+
+
+# ================ 👵 樂齡專區 ================
+with tab_elderly:
+    st.markdown("<div class='section-title'>👵 適合家有年長者的食譜</div>",
+                unsafe_allow_html=True)
+    n_eld = st.slider("👨‍👩‍👧 用餐人數", 2, 6, 4, key="elder_people")
+    elder_recipes = [r for r in RECIPES if r.get("elderly_ok")]
+    cols = st.columns(3)
+    for idx, r in enumerate(elder_recipes):
+        lo2, hi2 = scaled_cost(r, n_eld)
+        with cols[idx % 3]:
+            st.markdown(f"<div class='day-card'><div class='emoji-hero'>{r['emoji']}</div>"
+                        f"<div class='meal-name'>{r['name']}</div>"
+                        f"<span class='cost-badge'>💰 RM {lo2} – {hi2}</span>"
+                        f"<div class='note'>👵 {r.get('elderly_note', '')}</div></div>",
+                        unsafe_allow_html=True)
+    st.markdown("<div class='card'><b style='color:#8E4560'>🤍 為長輩備餐的小提醒</b><br>" +
+                "<br>".join(ELDERLY_TIPS) + "</div>", unsafe_allow_html=True)
+
+
+# ================ 💡 小貼士 ================
+with tab_tips:
+    t1, t2 = st.columns(2)
+    with t1:
+        st.markdown("<div class='card'><b style='color:#8E4560'>🧺 市場採買小貼士</b><br>" +
+                    "<br>".join(MARKET_TIPS) + "</div>", unsafe_allow_html=True)
+    with t2:
+        st.markdown("""<div class='card'><b style='color:#8E4560'>🌸 使用小撇步</b><br>
+        ① 「📊 市場行情」先看這個月什麼變便宜<br>
+        ② 「🔍 找菜」輸入想煮的菜 → 卡片結果可直接播放、排進餐表<br>
+        ③ 「📅 一週餐表」可手動排，或按 🪄 一鍵生成填滿一週<br>
+        ④ 「🛒 採買清單」自動加總食材＋估價，可下載或 WhatsApp 分享<br>
+        ⑤ 「💰 花費總覽」看本週每天大概要花多少
+        </div>""", unsafe_allow_html=True)
+        st.markdown("""<div class='card'><b style='color:#8E4560'>📍 之後可以擴充</b><br>
+        ・更精準的估價（接 LLM 依亞庇市價估每道菜）<br>
+        ・收藏「我家最愛」常用菜單<br>
+        ・節慶菜單（農曆新年、中秋圍爐）
+        </div>""", unsafe_allow_html=True)
+
+st.markdown("<p style='text-align:center;color:#C99AAD;font-size:0.8rem;margin-top:18px'>"
+            "🌸 今天煮什麼？ · 為亞庇的妳設計 · 估價為市場常見推算，實際以當日市價為準</p>",
+            unsafe_allow_html=True)
