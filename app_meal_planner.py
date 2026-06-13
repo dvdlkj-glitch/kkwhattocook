@@ -490,6 +490,8 @@ with tab_week:
                     prog = st.progress(0.0, text="開始生成…")
                     jobs = [(d, s) for d in range(gen_days) for s in gen_slots]
                     done = 0
+                    fails = []
+                    added = 0
                     for d, slot in jobs:
                         day = mon + timedelta(days=d)
                         pool = LUNCH_NAMES if slot == "午" else DINNER_NAMES
@@ -502,12 +504,16 @@ with tab_week:
                                     cards[0], yt_api_key=YT_KEY,
                                     anthropic_client=claude, supabase=supabase)
                                 MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
-                        except Exception:
-                            pass
+                                added += 1
+                        except Exception as e:
+                            fails.append(f"{name}：{e}")
                         done += 1
                     prog.progress(1.0, text="完成！")
-                    st.success("已生成，往下看餐表 👇")
-                    st.balloons()
+                    if added:
+                        st.success(f"已加入 {added} 道，往下看餐表 👇")
+                        st.balloons()
+                    if fails:
+                        st.warning("有 {} 道沒加成功（顯示前 5 個）：\n\n{}".format(len(fails), "\n".join(fails[:5])))
 
         nav1, nav2, nav3 = st.columns([1, 2, 1])
         with nav1:
@@ -541,6 +547,7 @@ with tab_week:
                             st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
                                         unsafe_allow_html=True)
                         for dish in dishes:
+                            vid = dish["video_id"]
                             thumb = dish.get("thumbnail_url")
                             visual = (f"<img class='yt-thumb' style='height:78px' src='{thumb}'/>"
                                       if thumb else "")
@@ -550,6 +557,24 @@ with tab_week:
                                 f"<div class='dish-mini'>{dish['title'][:26]}{flag}</div>"
                                 f"{cost_badge(dish.get('ingredients'))}</div>",
                                 unsafe_allow_html=True)
+                            st.link_button("📺 看影片",
+                                           f"https://www.youtube.com/watch?v={vid}",
+                                           use_container_width=True)
+                            with st.expander("🥬 食材"):
+                                if dish.get("inferred"):
+                                    st.caption("⚠ 由菜名推測，非影片實際食材，請核對")
+                                _ings = dish.get("ingredients") or []
+                                if _ings:
+                                    for _ing in _ings:
+                                        _q = _ing.get("qty")
+                                        _u = _ing.get("unit") or ""
+                                        if _ing.get("is_fuzzy") or _q is None:
+                                            _amt = "適量"
+                                        else:
+                                            _amt = f"{_q:g} {_u}".strip()
+                                        st.markdown(f"- {_ing.get('name', '')} {_amt}")
+                                else:
+                                    st.caption("這支影片的描述沒有附食材清單。")
                             if st.button("✕ 移除", key=f"rm_{day}_{slot}_{dish['video_id']}",
                                          use_container_width=True):
                                 MP.remove_from_plan(supabase, day, slot, dish["video_id"])
