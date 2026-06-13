@@ -204,6 +204,10 @@ footer{ visibility:hidden; }
 .yt-card-chan{ font-size:.74rem; color:#A0728B; margin:5px 0 2px; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:560px){ .yt-wrap{ height:190px; } }
+
+.dish-mini{ height:2.3em; min-height:2.3em; display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden; }
+.day-card .yt-thumb{ height:84px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -362,6 +366,42 @@ def fetch_official_mom():
 LUNCH_NAMES = [r["name"] for r in RECIPES if "lunch" in r["meal"]]
 DINNER_NAMES = [r["name"] for r in RECIPES if "dinner" in r["meal"]]
 
+CUISINES = ["全部", "中式", "台式", "西式", "泰式", "馬來西亞", "印尼"]
+CUISINE_KW = {"全部": "", "中式": "中式", "台式": "台式", "西式": "西式",
+              "泰式": "泰式", "馬來西亞": "馬來西亞", "印尼": "印尼"}
+CUISINE_POOLS = {
+    "中式": ["麻婆豆腐", "番茄炒蛋", "宮保雞丁", "糖醋排骨", "清蒸魚", "蒜蓉青菜", "紅燒豆腐", "蔥爆牛肉"],
+    "台式": ["滷肉飯", "三杯雞", "菜脯蛋", "客家小炒", "台式炒米粉", "麻油雞", "塔香茄子", "鹹蛋苦瓜"],
+    "西式": ["奶油義大利麵", "香煎雞排", "烤時蔬", "蘑菇濃湯", "焗烤馬鈴薯", "凱薩沙拉", "番茄肉醬麵", "煎鮭魚"],
+    "泰式": ["打拋豬", "泰式綠咖哩", "泰式炒河粉", "椒麻雞", "泰式青木瓜沙拉", "泰式炒空心菜", "泰式酸辣湯", "鳳梨炒飯"],
+    "馬來西亞": ["椰漿飯", "咖哩雞", "炒粿條", "海南雞飯", "叻沙", "馬來風光", "黃薑飯", "參巴江魚仔"],
+    "印尼": ["印尼炒飯", "仁當牛肉", "沙嗲雞", "巴東牛肉", "印尼炒麵", "加多加多", "薑黃飯", "參巴空心菜"],
+}
+CUISINE_POOLS["全部"] = [n for pool in CUISINE_POOLS.values() for n in pool]
+
+SKIN_TRIGGERS = ["蝦", "蟹", "貝", "蛤", "蚌", "魷", "茄子", "筍", "辣", "花生", "芒果"]
+SKIN_NOTE = ("💧 皮膚敏感模式：含蝦、蟹、貝、魷、茄子、竹筍、辣等常見發物的菜會標 ⚠。"
+             "此為飲食參考，若有確診過敏請以醫生囑咐為準。")
+
+def name_has_trigger(name):
+    return any(t in (name or "") for t in SKIN_TRIGGERS)
+
+def ingredients_have_trigger(ingredients):
+    for ing in ingredients or []:
+        nm = (ing.get("name_norm") or ing.get("name") or "")
+        if any(t in nm for t in SKIN_TRIGGERS):
+            return True
+    return False
+
+def scaled_cost_badge(ingredients, people):
+    est = estimate_dish_cost(ingredients)
+    if not est:
+        return "<span class='cost-badge'>💰 RM —</span>"
+    lo, hi, _m, _c = est
+    f = people_factor(people)
+    return f"<span class='cost-badge'>💰 估 RM {int(round(lo * f))}–{int(round(hi * f))}</span>"
+
+
 
 # ---------------------------------------------------------------- 頁首
 HERO_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
@@ -490,25 +530,37 @@ with tab_find:
     else:
         ss = st.session_state
         ss.setdefault("find_cards", [])
-        ss.setdefault("find_date", date.today())
-        ss.setdefault("find_slot", "晚")
         ss.setdefault("play_vid", None)
         ss.setdefault("play_title", "")
+        ss.setdefault("people", 4)
+        ss.setdefault("skin", False)
+        ss.setdefault("cuisine", "全部")
 
-        c1, c2, c3 = st.columns([1.4, 1, 2.2])
-        with c1:
-            ss.find_date = st.date_input("排入日期", value=ss.find_date, key="find_date_inp")
-        with c2:
-            ss.find_slot = st.radio("時段", MP.SLOTS,
-                                    index=MP.SLOTS.index(ss.find_slot), horizontal=True)
-        with c3:
-            query = st.text_input("輸入菜名", placeholder="例：麻婆豆腐、咖哩雞、番茄炒蛋")
+        with st.container(border=True):
+            st.markdown("<b style='color:#8E4560'>⚙️ 用餐設定</b>", unsafe_allow_html=True)
+            sc1, sc2 = st.columns([1.4, 1])
+            with sc1:
+                ss.people = st.slider("👨‍👩‍👧 用餐人數", 2, 6, ss.people, key="people_slider")
+            with sc2:
+                ss.skin = st.toggle("💧 皮膚敏感（標示發物）", value=ss.skin, key="skin_toggle")
+            try:
+                _cz = st.pills("🍽️ 料理大類", CUISINES, default=ss.cuisine, key="cuisine_pills")
+                ss.cuisine = _cz or "全部"
+            except Exception:
+                ss.cuisine = st.radio("🍽️ 料理大類", CUISINES,
+                                      index=CUISINES.index(ss.cuisine), horizontal=True,
+                                      key="cuisine_radio")
+            if ss.skin:
+                st.caption(SKIN_NOTE)
 
+        query = st.text_input("輸入菜名", placeholder="例：麻婆豆腐、咖哩雞、番茄炒蛋")
         if st.button("🔍 搜尋", key="find_search", type="primary"):
             if query.strip():
+                kw = CUISINE_KW.get(ss.cuisine, "")
+                full_q = (kw + " " + query.strip()).strip()
                 with st.spinner("搜尋中…"):
                     try:
-                        ss.find_cards = R.search_dishes(query.strip(), YT_KEY)
+                        ss.find_cards = R.search_dishes(full_q, YT_KEY)
                         ss.play_vid = None
                     except Exception as e:
                         st.error(f"搜尋失敗：{e}")
@@ -527,38 +579,51 @@ with tab_find:
                                       f"<span class='yt-play'>▶</span></div>")
                         else:
                             visual = "<div class='emoji-hero'>🍳</div>"
+                        skin_flag = ""
+                        if ss.skin and name_has_trigger(card["title"]):
+                            skin_flag = "<span class='warn-flag'> ⚠發物</span>"
                         st.markdown(
                             f"{visual}"
-                            f"<div class='yt-card-title'>{card['title']}</div>"
+                            f"<div class='yt-card-title'>{card['title']}{skin_flag}</div>"
                             f"<div class='yt-card-chan'>📺 {card['channel']}</div>",
                             unsafe_allow_html=True)
                         if st.button("▶️ 播放", key=f"play_{card['video_id']}",
                                      use_container_width=True):
                             ss.play_vid = card["video_id"]
                             ss.play_title = card["title"]
-                        if st.button("➕ 排入餐表", key=f"add_{card['video_id']}",
-                                     use_container_width=True):
-                            with st.spinner("抽取食材中…"):
-                                try:
-                                    rec = R.get_or_build_recipe(
-                                        card, yt_api_key=YT_KEY,
-                                        anthropic_client=claude, supabase=supabase)
-                                    MP.add_to_plan(supabase, ss.find_date,
-                                                   ss.find_slot, card["video_id"])
-                                    flag = "（⚠ 推測）" if rec.get("inferred") else ""
-                                    st.success(f"已排入 {ss.find_date} {ss.find_slot}："
-                                               f"{rec['title'][:18]}{flag}")
-                                except Exception as e:
-                                    st.error(f"排入失敗：{e}")
+                        with st.popover("➕ 排入餐表", use_container_width=True):
+                            d = st.date_input("排到哪一天", value=date.today(),
+                                              key=f"d_{card['video_id']}")
+                            sl = st.radio("時段", MP.SLOTS, horizontal=True,
+                                          key=f"sl_{card['video_id']}")
+                            if st.button("✅ 確認排入", key=f"cf_{card['video_id']}",
+                                         use_container_width=True):
+                                with st.spinner("抽取食材中…"):
+                                    try:
+                                        rec = R.get_or_build_recipe(
+                                            card, yt_api_key=YT_KEY,
+                                            anthropic_client=claude, supabase=supabase)
+                                        MP.add_to_plan(supabase, d, sl, card["video_id"])
+                                        warn = ""
+                                        if ss.skin and ingredients_have_trigger(rec.get("ingredients")):
+                                            warn = "（⚠ 含發物）"
+                                        st.success(f"已排入 {d} {sl}：{rec['title'][:16]}{warn}")
+                                    except Exception as e:
+                                        st.error(f"排入失敗：{e}")
 
+        st.markdown("<div id='find-player'></div>", unsafe_allow_html=True)
         if ss.play_vid:
-            st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title[:50]}</div>",
-                        unsafe_allow_html=True)
+            pc1, pc2 = st.columns([3, 1])
+            with pc1:
+                st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title[:44]}</div>",
+                            unsafe_allow_html=True)
+            with pc2:
+                if st.button("✕ 關閉影片", key="close_find_player", use_container_width=True):
+                    ss.play_vid = None
+                    st.rerun()
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid}")
-            st.caption("點播放器右下角可全螢幕；點 YouTube 標誌可前往頻道。")
+            st.caption("點播放器右下角可全螢幕。")
 
-
-# ================ 📅 一週餐表 ================
 with tab_week:
     st.markdown("<div class='section-title'>📅 一週餐表</div>", unsafe_allow_html=True)
 
@@ -570,16 +635,21 @@ with tab_week:
         ss.setdefault("play_vid_week", None)
         ss.setdefault("play_title_week", "")
         ss.setdefault("scroll_to_player", False)
+        ss.setdefault("people", 4)
+        ss.setdefault("skin", False)
+        ss.setdefault("cuisine", "全部")
 
         def render_dish(dish, day, slot):
             vid = dish["video_id"]
             thumb = dish.get("thumbnail_url")
             visual = (f"<img class='yt-thumb' src='{thumb}'/>" if thumb else "")
             flag = " <span class='warn-flag'>⚠</span>" if dish.get("inferred") else ""
+            if ss.get("skin") and ingredients_have_trigger(dish.get("ingredients")):
+                flag += " <span class='warn-flag'>⚠發物</span>"
             st.markdown(
                 f"<div class='day-card'>{visual}"
                 f"<div class='dish-mini'>{dish['title'][:40]}{flag}</div>"
-                f"{cost_badge(dish.get('ingredients'))}</div>",
+                f"{scaled_cost_badge(dish.get('ingredients'), ss.get('people', 4))}</div>",
                 unsafe_allow_html=True)
             if st.button("▶️ 播放", key=f"playw_{day}_{slot}_{vid}", use_container_width=True):
                 ss.play_vid_week = vid
@@ -603,8 +673,9 @@ with tab_week:
                 st.rerun()
 
         with st.container(border=True):
-            st.markdown("<b style='color:#8E4560'>🪄 一鍵生成：自動從家常菜池搜 YouTube 填滿餐表</b>",
+            st.markdown("<b style='color:#8E4560'>🪄 一鍵生成：依你選的料理大類搜 YouTube 填滿餐表</b>",
                         unsafe_allow_html=True)
+            st.caption(f"目前料理大類：{ss.get('cuisine', '全部')}　·　可在「🔍 找菜」分頁的設定卡更換")
             g1, g2 = st.columns([1, 1])
             with g1:
                 gen_days = st.slider("要排幾天", 1, 7, 3, key="gen_days")
@@ -623,24 +694,32 @@ with tab_week:
                 if not gen_slots:
                     st.warning("至少選一個時段。")
                 else:
+                    pool = CUISINE_POOLS.get(ss.get("cuisine", "全部"), CUISINE_POOLS["全部"])
                     mon = MP.week_start(ss.week_anchor)
                     prog = st.progress(0.0, text="開始生成…")
-                    jobs = [(d, s) for d in range(gen_days) for s in gen_slots]
+                    jobs = [(d, s2) for d in range(gen_days) for s2 in gen_slots]
                     done = 0
                     fails = []
                     added = 0
                     for d, slot in jobs:
                         day = mon + timedelta(days=d)
-                        pool = LUNCH_NAMES if slot == "午" else DINNER_NAMES
                         name = random.choice(pool) if pool else "家常菜"
+                        if ss.get("skin"):
+                            tries = 0
+                            while name_has_trigger(name) and tries < 6:
+                                name = random.choice(pool)
+                                tries += 1
                         prog.progress(done / len(jobs), text=f"搜尋：{name}")
                         try:
                             cards = R.search_dishes(name, YT_KEY, max_results=1)
                             if cards:
-                                R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
-                                                      anthropic_client=claude, supabase=supabase)
-                                MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
-                                added += 1
+                                rec = R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
+                                                            anthropic_client=claude, supabase=supabase)
+                                if ss.get("skin") and ingredients_have_trigger(rec.get("ingredients")):
+                                    fails.append(f"{name}：含發物已略過")
+                                else:
+                                    MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
+                                    added += 1
                         except Exception as e:
                             fails.append(f"{name}：{e}")
                         done += 1
@@ -724,8 +803,15 @@ with tab_week:
 
         st.markdown("<div id='player-anchor'></div>", unsafe_allow_html=True)
         if ss.get("play_vid_week"):
-            st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title_week[:50]}</div>",
-                        unsafe_allow_html=True)
+            pc1, pc2 = st.columns([3, 1])
+            with pc1:
+                st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title_week[:44]}</div>",
+                            unsafe_allow_html=True)
+            with pc2:
+                if st.button("✕ 關閉影片", key="close_week_player", use_container_width=True):
+                    ss.play_vid_week = None
+                    ss.scroll_to_player = False
+                    st.rerun()
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid_week}")
             st.caption("點播放器右下角可全螢幕。")
             if ss.get("scroll_to_player"):
@@ -736,8 +822,6 @@ with tab_week:
                     height=0)
                 ss.scroll_to_player = False
 
-
-# ================ 🛒 採買清單 ================
 with tab_shop:
     st.markdown("<div class='section-title'>🛒 本週採買清單（YouTube 食材自動加總）</div>",
                 unsafe_allow_html=True)
