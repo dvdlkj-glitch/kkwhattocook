@@ -208,6 +208,12 @@ footer{ visibility:hidden; }
 .dish-mini{ height:2.3em; min-height:2.3em; display:-webkit-box; -webkit-line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden; }
 .day-card .yt-thumb{ height:84px; }
+
+.rec-emoji{ font-size:30px; text-align:center; }
+.rec-name{ font-weight:800; color:var(--plum); font-size:.86rem; text-align:center;
+  line-height:1.3; height:2.4em; display:-webkit-box; -webkit-line-clamp:2;
+  -webkit-box-orient:vertical; overflow:hidden; margin:4px 0 6px; }
+.rec-name + .cost-badge{ display:block; text-align:center; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -369,15 +375,24 @@ DINNER_NAMES = [r["name"] for r in RECIPES if "dinner" in r["meal"]]
 CUISINES = ["全部", "中式", "台式", "西式", "泰式", "馬來西亞", "印尼"]
 CUISINE_KW = {"全部": "", "中式": "中式", "台式": "台式", "西式": "西式",
               "泰式": "泰式", "馬來西亞": "馬來西亞", "印尼": "印尼"}
-CUISINE_POOLS = {
-    "中式": ["麻婆豆腐", "番茄炒蛋", "宮保雞丁", "糖醋排骨", "清蒸魚", "蒜蓉青菜", "紅燒豆腐", "蔥爆牛肉"],
-    "台式": ["滷肉飯", "三杯雞", "菜脯蛋", "客家小炒", "台式炒米粉", "麻油雞", "塔香茄子", "鹹蛋苦瓜"],
-    "西式": ["奶油義大利麵", "香煎雞排", "烤時蔬", "蘑菇濃湯", "焗烤馬鈴薯", "凱薩沙拉", "番茄肉醬麵", "煎鮭魚"],
-    "泰式": ["打拋豬", "泰式綠咖哩", "泰式炒河粉", "椒麻雞", "泰式青木瓜沙拉", "泰式炒空心菜", "泰式酸辣湯", "鳳梨炒飯"],
-    "馬來西亞": ["椰漿飯", "咖哩雞", "炒粿條", "海南雞飯", "叻沙", "馬來風光", "黃薑飯", "參巴江魚仔"],
-    "印尼": ["印尼炒飯", "仁當牛肉", "沙嗲雞", "巴東牛肉", "印尼炒麵", "加多加多", "薑黃飯", "參巴空心菜"],
+CUISINE_DISHES = {
+    "中式": [("麻婆豆腐", 8, 12), ("番茄炒蛋", 5, 8), ("宮保雞丁", 12, 18), ("糖醋排骨", 14, 20),
+            ("清蒸魚", 16, 24), ("蒜蓉青菜", 5, 8), ("紅燒豆腐", 7, 11), ("蔥爆牛肉", 18, 26)],
+    "台式": [("滷肉飯", 8, 12), ("三杯雞", 14, 20), ("菜脯蛋", 6, 9), ("客家小炒", 14, 20),
+            ("台式炒米粉", 8, 13), ("麻油雞", 18, 26), ("塔香茄子", 8, 12), ("鹹蛋苦瓜", 9, 14)],
+    "西式": [("奶油義大利麵", 12, 18), ("香煎雞排", 12, 18), ("烤時蔬", 8, 13), ("蘑菇濃湯", 8, 12),
+            ("焗烤馬鈴薯", 9, 14), ("凱薩沙拉", 10, 15), ("番茄肉醬麵", 12, 18), ("煎鮭魚", 20, 30)],
+    "泰式": [("打拋豬", 12, 18), ("泰式綠咖哩", 14, 20), ("泰式炒河粉", 10, 16), ("椒麻雞", 13, 19),
+            ("泰式青木瓜沙拉", 8, 13), ("泰式炒空心菜", 7, 11), ("泰式酸辣湯", 12, 18), ("鳳梨炒飯", 10, 15)],
+    "馬來西亞": [("椰漿飯", 7, 11), ("咖哩雞", 14, 20), ("炒粿條", 8, 13), ("海南雞飯", 10, 15),
+              ("叻沙", 10, 16), ("馬來風光", 9, 14), ("黃薑飯", 7, 11), ("參巴江魚仔", 8, 12)],
+    "印尼": [("印尼炒飯", 8, 13), ("仁當牛肉", 20, 30), ("沙嗲雞", 12, 18), ("巴東牛肉", 20, 30),
+            ("印尼炒麵", 8, 13), ("加多加多", 9, 14), ("薑黃飯", 7, 11), ("參巴空心菜", 7, 11)],
 }
-CUISINE_POOLS["全部"] = [n for pool in CUISINE_POOLS.values() for n in pool]
+CUISINE_DISHES["全部"] = [d for _c in ["中式", "台式", "西式", "泰式", "馬來西亞", "印尼"]
+                        for d in CUISINE_DISHES[_c]]
+CUISINE_POOLS = {c: [n for (n, _lo, _hi) in lst] for c, lst in CUISINE_DISHES.items()}
+DISH_PRICE = {n: (lo, hi) for lst in CUISINE_DISHES.values() for (n, lo, hi) in lst}
 
 SKIN_TRIGGERS = ["蝦", "蟹", "貝", "蛤", "蚌", "魷", "茄子", "筍", "辣", "花生", "芒果"]
 SKIN_NOTE = ("💧 皮膚敏感模式：含蝦、蟹、貝、魷、茄子、竹筍、辣等常見發物的菜會標 ⚠。"
@@ -553,6 +568,50 @@ with tab_find:
             if ss.skin:
                 st.caption(SKIN_NOTE)
 
+        _cz = ss.cuisine
+        _pool = CUISINE_DISHES.get(_cz) or CUISINE_DISHES["全部"]
+        _rk = f"recs_{_cz}"
+        rc1, rc2 = st.columns([3, 1])
+        with rc1:
+            st.markdown(f"<div class='section-title'>🍴 為你精選 5 道【{_cz}】</div>",
+                        unsafe_allow_html=True)
+        with rc2:
+            _regen = st.button("🔄 換一批", key="regen_recs", use_container_width=True)
+        if _regen or _rk not in ss:
+            ss[_rk] = random.sample(_pool, min(5, len(_pool)))
+        _emojis = ["🍲", "🍛", "🥘", "🍜", "🥗", "🍳", "🐟", "🍗"]
+        _f = people_factor(ss.get("people", 4))
+        _cols = st.columns(5)
+        for _i, (_name, _lo, _hi) in enumerate(ss[_rk]):
+            with _cols[_i % 5]:
+                with st.container(border=True):
+                    _fl = " ⚠" if (ss.get("skin") and name_has_trigger(_name)) else ""
+                    st.markdown(
+                        f"<div class='rec-emoji'>{_emojis[_i % len(_emojis)]}</div>"
+                        f"<div class='rec-name'>{_name}{_fl}</div>"
+                        f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
+                        unsafe_allow_html=True)
+                    with st.popover("➕ 排入", use_container_width=True):
+                        _d = st.date_input("排到哪一天", value=date.today(), key=f"rd_{_cz}_{_i}")
+                        _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"rs_{_cz}_{_i}")
+                        if st.button("✅ 確認排入", key=f"rcf_{_cz}_{_i}", use_container_width=True):
+                            with st.spinner(f"從 YouTube 找「{_name}」並抽食材…"):
+                                try:
+                                    _cards = R.search_dishes(
+                                        (CUISINE_KW.get(_cz, "") + " " + _name).strip(),
+                                        YT_KEY, max_results=1)
+                                    if _cards:
+                                        _rec = R.get_or_build_recipe(
+                                            _cards[0], yt_api_key=YT_KEY,
+                                            anthropic_client=claude, supabase=supabase)
+                                        MP.add_to_plan(supabase, _d, _sl, _cards[0]["video_id"])
+                                        st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}")
+                                    else:
+                                        st.error("找不到對應影片，換一道試試。")
+                                except Exception as _e:
+                                    st.error(f"排入失敗：{_e}")
+
+        st.markdown("<div class='section-title'>🔎 或自己搜尋</div>", unsafe_allow_html=True)
         query = st.text_input("輸入菜名", placeholder="例：麻婆豆腐、咖哩雞、番茄炒蛋")
         if st.button("🔍 搜尋", key="find_search", type="primary"):
             if query.strip():
