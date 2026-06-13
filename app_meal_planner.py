@@ -214,6 +214,10 @@ footer{ visibility:hidden; }
   line-height:1.3; height:2.4em; display:-webkit-box; -webkit-line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden; margin:4px 0 6px; }
 .rec-name + .cost-badge{ display:block; text-align:center; }
+
+.cost-badge{ white-space:nowrap; }
+.day-card .cost-badge{ font-size:.76rem; padding:3px 8px; }
+.day-card .dish-mini{ height:2.4em; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -734,7 +738,19 @@ with tab_week:
         with st.container(border=True):
             st.markdown("<b style='color:#8E4560'>🪄 一鍵生成：依你選的料理大類搜 YouTube 填滿餐表</b>",
                         unsafe_allow_html=True)
-            st.caption(f"目前料理大類：{ss.get('cuisine', '全部')}　·　可在「🔍 找菜」分頁的設定卡更換")
+            gcz1, gcz2 = st.columns([1.6, 1])
+            with gcz1:
+                try:
+                    gen_cuisine = st.pills("🍽️ 料理大類", CUISINES,
+                                           default=ss.get("cuisine", "全部"), key="gen_cuisine") or "全部"
+                except Exception:
+                    gen_cuisine = st.selectbox("🍽️ 料理大類", CUISINES,
+                                               index=CUISINES.index(ss.get("cuisine", "全部")),
+                                               key="gen_cuisine_sb")
+            with gcz2:
+                gen_skin = st.toggle("💧 皮膚敏感（避開發物）", value=ss.get("skin", False), key="gen_skin")
+            if gen_skin:
+                st.caption(SKIN_NOTE)
             g1, g2 = st.columns([1, 1])
             with g1:
                 gen_days = st.slider("要排幾天", 1, 7, 3, key="gen_days")
@@ -753,7 +769,7 @@ with tab_week:
                 if not gen_slots:
                     st.warning("至少選一個時段。")
                 else:
-                    pool = CUISINE_POOLS.get(ss.get("cuisine", "全部"), CUISINE_POOLS["全部"])
+                    pool = CUISINE_POOLS.get(gen_cuisine, CUISINE_POOLS["全部"])
                     mon = MP.week_start(ss.week_anchor)
                     prog = st.progress(0.0, text="開始生成…")
                     jobs = [(d, s2) for d in range(gen_days) for s2 in gen_slots]
@@ -763,7 +779,7 @@ with tab_week:
                     for d, slot in jobs:
                         day = mon + timedelta(days=d)
                         name = random.choice(pool) if pool else "家常菜"
-                        if ss.get("skin"):
+                        if gen_skin:
                             tries = 0
                             while name_has_trigger(name) and tries < 6:
                                 name = random.choice(pool)
@@ -774,7 +790,7 @@ with tab_week:
                             if cards:
                                 rec = R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
                                                             anthropic_client=claude, supabase=supabase)
-                                if ss.get("skin") and ingredients_have_trigger(rec.get("ingredients")):
+                                if gen_skin and ingredients_have_trigger(rec.get("ingredients")):
                                     fails.append(f"{name}：含發物已略過")
                                 else:
                                     MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
