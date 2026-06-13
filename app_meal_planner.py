@@ -771,30 +771,59 @@ with tab_week:
                 else:
                     pool = CUISINE_POOLS.get(gen_cuisine, CUISINE_POOLS["全部"])
                     mon = MP.week_start(ss.week_anchor)
-                    prog = st.progress(0.0, text="開始生成…")
+                    # 候選菜名：先濾發物，洗牌後「不重複」依序取用
+                    cand = [n for n in pool if not (gen_skin and name_has_trigger(n))]
+                    if not cand:
+                        cand = list(pool) or ["家常菜"]
+                    random.shuffle(cand)
                     jobs = [(d, s2) for d in range(gen_days) for s2 in gen_slots]
+                    if len(cand) < len(jobs):
+                        st.info(f"「{gen_cuisine}」可用菜色約 {len(cand)} 道，少於要排的 {len(jobs)} 格；"
+                                f"為避免重複，部分格子可能留空。可改選「全部」或減少天數／時段。")
+                    # 本週已排的影片一併避開，避免和現有的重複
+                    try:
+                        _ex = MP.get_plan(supabase, mon, mon + timedelta(days=6))
+                        used_vids = {r["video_id"] for r in _ex}
+                    except Exception:
+                        used_vids = set()
+                    used_names = set()
+                    ci = 0
+                    prog = st.progress(0.0, text="開始生成…")
                     done = 0
                     fails = []
                     added = 0
                     for d, slot in jobs:
                         day = mon + timedelta(days=d)
-                        name = random.choice(pool) if pool else "家常菜"
-                        if gen_skin:
-                            tries = 0
-                            while name_has_trigger(name) and tries < 6:
-                                name = random.choice(pool)
-                                tries += 1
+                        # 依序取下一個沒用過的菜名；候選用完就重新洗牌循環
+                        name = None
+                        while ci < len(cand):
+                            c = cand[ci]
+                            ci += 1
+                            if c not in used_names:
+                                name = c
+                                break
+                        if name is None:
+                            random.shuffle(cand)
+                            ci = 0
+                            name = cand[0] if cand else "家常菜"
+                            ci = 1
+                        used_names.add(name)
                         prog.progress(done / len(jobs), text=f"搜尋：{name}")
                         try:
                             cards = R.search_dishes(name, YT_KEY, max_results=1)
                             if cards:
-                                rec = R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
-                                                            anthropic_client=claude, supabase=supabase)
-                                if gen_skin and ingredients_have_trigger(rec.get("ingredients")):
-                                    fails.append(f"{name}：含發物已略過")
+                                vid = cards[0]["video_id"]
+                                if vid in used_vids:
+                                    fails.append(f"{name}：與已排重複，略過")
                                 else:
-                                    MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
-                                    added += 1
+                                    rec = R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
+                                                                anthropic_client=claude, supabase=supabase)
+                                    if gen_skin and ingredients_have_trigger(rec.get("ingredients")):
+                                        fails.append(f"{name}：含發物已略過")
+                                    else:
+                                        MP.add_to_plan(supabase, day, slot, vid)
+                                        used_vids.add(vid)
+                                        added += 1
                         except Exception as e:
                             fails.append(f"{name}：{e}")
                         done += 1
