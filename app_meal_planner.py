@@ -20,6 +20,7 @@ from datetime import date, timedelta
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from anthropic import Anthropic
 from supabase import create_client
 
@@ -350,19 +351,63 @@ DINNER_NAMES = [r["name"] for r in RECIPES if "dinner" in r["meal"]]
 
 
 # ---------------------------------------------------------------- 頁首
-st.markdown("""
-<div class='hero'>
-  <div style='display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px'>
-    <h1>🌸 今天煮什麼？</h1>
-    <span style='background:rgba(255,248,249,.18); border:1px solid rgba(244,217,166,.55);
-                 color:#F4D9A6; font-size:.78rem; font-weight:700; letter-spacing:.5px;
-                 border-radius:999px; padding:4px 14px; white-space:nowrap'>
-      ✦ David Lau Cooking Market Project</span>
-  </div>
-  <p>亞庇家庭買菜煮飯小幫手 ｜ <span class='gold'>麗都市場 Lido Market</span> ＆
-     <span class='gold'>生源 Damai Fresh Market</span> ｜ YouTube 找菜・一鍵排餐・採買清單 💕</p>
+HERO_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+ html,body{margin:0;height:100%;overflow:hidden;font-family:'Noto Sans TC',sans-serif;}
+ #wrap{position:relative;width:100%;height:200px;border-radius:24px;overflow:hidden;
+   background:linear-gradient(120deg,#C2698A,#9C4D68 55%,#A8546F);}
+ #c{position:absolute;inset:0;}
+ #txt{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+   padding:0 26px;color:#FFF8F9;z-index:2;}
+ #txt h1{margin:0;font-size:30px;font-weight:900;letter-spacing:1px;opacity:0;}
+ #txt p{margin:8px 0 0;font-size:14px;opacity:0;line-height:1.5;}
+ .gold{color:#F4D9A6;font-weight:800;}
+ .badge{display:inline-block;margin-top:10px;background:rgba(255,248,249,.18);
+   border:1px solid rgba(244,217,166,.55);color:#F4D9A6;font-size:12px;font-weight:700;
+   border-radius:999px;padding:4px 14px;opacity:0;width:fit-content;}
+ @media(max-width:560px){#txt h1{font-size:23px}#txt p{font-size:12px}}
+</style></head><body>
+<div id="wrap"><canvas id="c"></canvas>
+ <div id="txt">
+  <h1 id="t1">🌸 今天煮什麼？</h1>
+  <p id="t2">亞庇家庭買菜煮飯小幫手 · <span class="gold">麗都 &amp; 生源市場</span> · YouTube 找菜・一鍵排餐 💕</p>
+  <span class="badge" id="t3">✦ David Lau Cooking Market Project</span>
+ </div>
 </div>
-""", unsafe_allow_html=True)
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+ var wrap=document.getElementById('wrap');
+ var W=wrap.clientWidth,H=wrap.clientHeight;
+ var renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),alpha:true,antialias:true});
+ renderer.setSize(W,H);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+ var scene=new THREE.Scene();
+ var camera=new THREE.PerspectiveCamera(60,W/H,0.1,100);camera.position.z=18;
+ var cv=document.createElement('canvas');cv.width=cv.height=64;var ctx=cv.getContext('2d');
+ var g=ctx.createRadialGradient(32,32,0,32,32,32);
+ g.addColorStop(0,'rgba(255,255,255,0.95)');g.addColorStop(0.4,'rgba(255,225,235,0.7)');
+ g.addColorStop(1,'rgba(255,200,220,0)');ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
+ var tex=new THREE.CanvasTexture(cv);
+ var N=70,pos=new Float32Array(N*3),spd=[];
+ for(var i=0;i<N;i++){pos[i*3]=(Math.random()-0.5)*44;pos[i*3+1]=(Math.random()-0.5)*26;pos[i*3+2]=(Math.random()-0.5)*10;
+  spd.push({x:(Math.random()-0.5)*0.01,y:0.01+Math.random()*0.02});}
+ var geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+ var mat=new THREE.PointsMaterial({size:1.7,map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.85});
+ var pts=new THREE.Points(geo,mat);scene.add(pts);
+ function animate(){requestAnimationFrame(animate);
+  var a=geo.attributes.position.array;
+  for(var i=0;i<N;i++){a[i*3]+=spd[i].x;a[i*3+1]+=spd[i].y;if(a[i*3+1]>14){a[i*3+1]=-14;a[i*3]=(Math.random()-0.5)*44;}}
+  geo.attributes.position.needsUpdate=true;pts.rotation.z+=0.0004;renderer.render(scene,camera);}
+ animate();
+ window.addEventListener('resize',function(){W=wrap.clientWidth;H=wrap.clientHeight;renderer.setSize(W,H);camera.aspect=W/H;camera.updateProjectionMatrix();});
+ if(window.gsap){gsap.to('#t1',{opacity:1,y:0,duration:0.8,ease:'power3.out',startAt:{y:18}});
+  gsap.to('#t2',{opacity:1,duration:0.8,delay:0.25});gsap.to('#t3',{opacity:1,duration:0.8,delay:0.5});}
+ else{document.getElementById('t1').style.opacity=1;document.getElementById('t2').style.opacity=1;document.getElementById('t3').style.opacity=1;}
+})();
+</script></body></html>"""
+components.html(HERO_HTML, height=215)
 
 if not CLIENTS_OK:
     st.error("⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
@@ -499,8 +544,7 @@ with tab_find:
 
 # ================ 📅 一週餐表 ================
 with tab_week:
-    st.markdown("<div class='section-title'>📅 一週餐表（粉色日曆卡）</div>",
-                unsafe_allow_html=True)
+    st.markdown("<div class='section-title'>📅 一週餐表</div>", unsafe_allow_html=True)
 
     if not CLIENTS_OK:
         st.info("此功能需要 Secrets 設定。")
@@ -509,8 +553,39 @@ with tab_week:
         ss.setdefault("week_anchor", date.today())
         ss.setdefault("play_vid_week", None)
         ss.setdefault("play_title_week", "")
+        ss.setdefault("scroll_to_player", False)
 
-        # 一鍵生成
+        def render_dish(dish, day, slot):
+            vid = dish["video_id"]
+            thumb = dish.get("thumbnail_url")
+            visual = (f"<img class='yt-thumb' src='{thumb}'/>" if thumb else "")
+            flag = " <span class='warn-flag'>⚠</span>" if dish.get("inferred") else ""
+            st.markdown(
+                f"<div class='day-card'>{visual}"
+                f"<div class='dish-mini'>{dish['title'][:40]}{flag}</div>"
+                f"{cost_badge(dish.get('ingredients'))}</div>",
+                unsafe_allow_html=True)
+            if st.button("▶️ 播放", key=f"playw_{day}_{slot}_{vid}", use_container_width=True):
+                ss.play_vid_week = vid
+                ss.play_title_week = dish["title"]
+                ss.scroll_to_player = True
+                st.toast("▶️ 影片已在下方開始播放")
+            with st.expander("🥬 食材"):
+                if dish.get("inferred"):
+                    st.caption("⚠ 由菜名推測，非影片實際食材，請核對")
+                _ings = dish.get("ingredients") or []
+                if _ings:
+                    for _ing in _ings:
+                        _q = _ing.get("qty")
+                        _u = _ing.get("unit") or ""
+                        _amt = "適量" if (_ing.get("is_fuzzy") or _q is None) else f"{_q:g} {_u}".strip()
+                        st.markdown(f"- {_ing.get('name', '')} {_amt}")
+                else:
+                    st.caption("這支影片的描述沒有附食材清單。")
+            if st.button("✕ 移除", key=f"rm_{day}_{slot}_{vid}", use_container_width=True):
+                MP.remove_from_plan(supabase, day, slot, vid)
+                st.rerun()
+
         with st.container(border=True):
             st.markdown("<b style='color:#8E4560'>🪄 一鍵生成：自動從家常菜池搜 YouTube 填滿餐表</b>",
                         unsafe_allow_html=True)
@@ -521,7 +596,14 @@ with tab_week:
                 gen_slots = st.multiselect("時段", MP.SLOTS, default=MP.SLOTS, key="gen_slots")
             st.caption(f"預估耗用 YouTube 額度約 {gen_days * max(1, len(gen_slots)) * 100} units"
                        f"（每道菜 100u，已抽取過的會走快取）。")
-            if st.button("🪄 一鍵生成本週餐表", key="gen_week", type="primary"):
+            gb1, gb2 = st.columns([1.4, 1])
+            with gb1:
+                go = st.button("🪄 一鍵生成本週餐表", key="gen_week", type="primary",
+                               use_container_width=True)
+            with gb2:
+                if st.button("🗑️ 清空本週", key="clear_week", use_container_width=True):
+                    ss._confirm_clear = True
+            if go:
                 if not gen_slots:
                     st.warning("至少選一個時段。")
                 else:
@@ -539,9 +621,8 @@ with tab_week:
                         try:
                             cards = R.search_dishes(name, YT_KEY, max_results=1)
                             if cards:
-                                rec = R.get_or_build_recipe(
-                                    cards[0], yt_api_key=YT_KEY,
-                                    anthropic_client=claude, supabase=supabase)
+                                R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
+                                                      anthropic_client=claude, supabase=supabase)
                                 MP.add_to_plan(supabase, day, slot, cards[0]["video_id"])
                                 added += 1
                         except Exception as e:
@@ -554,80 +635,90 @@ with tab_week:
                     if fails:
                         st.warning("有 {} 道沒加成功（顯示前 5 個）：\n\n{}".format(len(fails), "\n".join(fails[:5])))
 
+        if ss.get("_confirm_clear"):
+            st.warning("確定要清空本週所有已排的菜嗎？此動作無法復原。")
+            cc1, cc2 = st.columns(2)
+            if cc1.button("✅ 確定清空", key="clear_yes", type="primary", use_container_width=True):
+                MP.clear_week(supabase, ss.week_anchor)
+                ss._confirm_clear = False
+                ss.play_vid_week = None
+                st.rerun()
+            if cc2.button("取消", key="clear_no", use_container_width=True):
+                ss._confirm_clear = False
+                st.rerun()
+
         nav1, nav2, nav3 = st.columns([1, 2, 1])
         with nav1:
-            if st.button("← 上一週"):
+            if st.button("← 上一週", use_container_width=True):
                 ss.week_anchor -= timedelta(days=7)
         with nav3:
-            if st.button("下一週 →"):
+            if st.button("下一週 →", use_container_width=True):
                 ss.week_anchor += timedelta(days=7)
         mon = MP.week_start(ss.week_anchor)
         with nav2:
             st.markdown(f"<div style='text-align:center;font-weight:900;color:#8E4560'>"
                         f"{mon} ～ {mon + timedelta(days=6)}</div>", unsafe_allow_html=True)
 
+        week_names = ["一", "二", "三", "四", "五", "六", "日"]
+        view = st.radio("檢視方式", ["📆 單日", "🗓️ 整週"], horizontal=True, key="week_view")
+
         grid = {}
         try:
             grid = MP.get_week_plan(supabase, ss.week_anchor)
-            week_names = ["一", "二", "三", "四", "五", "六", "日"]
-            day_cols = st.columns(7)
-            for d in range(7):
-                day = mon + timedelta(days=d)
-                with day_cols[d]:
-                    st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[d]} 週{week_names[d]}</span>"
-                                f"<span class='day-cost'>{day.month}/{day.day}</span></div>",
+            if view == "📆 單日":
+                day_labels = [f"週{week_names[i]}" for i in range(7)]
+                default_i = (date.today() - mon).days
+                default_i = default_i if 0 <= default_i <= 6 else 0
+                sel = st.radio("選一天", day_labels, index=default_i, horizontal=True,
+                               key="day_sel", label_visibility="collapsed")
+                di = day_labels.index(sel)
+                day = mon + timedelta(days=di)
+                st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[di]} 週{week_names[di]}</span>"
+                            f"<span class='day-cost'>{day.month}/{day.day}</span></div>",
+                            unsafe_allow_html=True)
+                for slot in MP.SLOTS:
+                    st.markdown(f"<div class='slot-label'>{'🍱 午餐' if slot == '午' else '🌙 晚餐'}</div>",
                                 unsafe_allow_html=True)
-                    for slot in MP.SLOTS:
-                        st.markdown(f"<div class='slot-label'>"
-                                    f"{'🍱 午餐' if slot == '午' else '🌙 晚餐'}</div>",
+                    dishes = grid.get((str(day), slot), [])
+                    if not dishes:
+                        st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
                                     unsafe_allow_html=True)
-                        dishes = grid.get((str(day), slot), [])
-                        if not dishes:
-                            st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
+                    for dish in dishes:
+                        render_dish(dish, day, slot)
+            else:
+                day_cols = st.columns(7)
+                for d in range(7):
+                    day = mon + timedelta(days=d)
+                    with day_cols[d]:
+                        st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[d]} 週{week_names[d]}</span>"
+                                    f"<span class='day-cost'>{day.month}/{day.day}</span></div>",
+                                    unsafe_allow_html=True)
+                        for slot in MP.SLOTS:
+                            st.markdown(f"<div class='slot-label'>{'🍱 午餐' if slot == '午' else '🌙 晚餐'}</div>",
                                         unsafe_allow_html=True)
-                        for dish in dishes:
-                            vid = dish["video_id"]
-                            thumb = dish.get("thumbnail_url")
-                            visual = (f"<img class='yt-thumb' style='height:78px' src='{thumb}'/>"
-                                      if thumb else "")
-                            flag = " <span class='warn-flag'>⚠</span>" if dish.get("inferred") else ""
-                            st.markdown(
-                                f"<div class='day-card' style='padding:8px'>{visual}"
-                                f"<div class='dish-mini'>{dish['title'][:26]}{flag}</div>"
-                                f"{cost_badge(dish.get('ingredients'))}</div>",
-                                unsafe_allow_html=True)
-                            if st.button("▶️ 播放", key=f"playw_{vid}",
-                                         use_container_width=True):
-                                ss.play_vid_week = vid
-                                ss.play_title_week = dish["title"]
-                            with st.expander("🥬 食材"):
-                                if dish.get("inferred"):
-                                    st.caption("⚠ 由菜名推測，非影片實際食材，請核對")
-                                _ings = dish.get("ingredients") or []
-                                if _ings:
-                                    for _ing in _ings:
-                                        _q = _ing.get("qty")
-                                        _u = _ing.get("unit") or ""
-                                        if _ing.get("is_fuzzy") or _q is None:
-                                            _amt = "適量"
-                                        else:
-                                            _amt = f"{_q:g} {_u}".strip()
-                                        st.markdown(f"- {_ing.get('name', '')} {_amt}")
-                                else:
-                                    st.caption("這支影片的描述沒有附食材清單。")
-                            if st.button("✕ 移除", key=f"rm_{day}_{slot}_{dish['video_id']}",
-                                         use_container_width=True):
-                                MP.remove_from_plan(supabase, day, slot, dish["video_id"])
-                                st.rerun()
+                            dishes = grid.get((str(day), slot), [])
+                            if not dishes:
+                                st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
+                                            unsafe_allow_html=True)
+                            for dish in dishes:
+                                render_dish(dish, day, slot)
         except Exception as e:
             st.error(f"餐表載入錯誤：{e}")
         st.session_state["_grid_cache"] = grid
 
+        st.markdown("<div id='player-anchor'></div>", unsafe_allow_html=True)
         if ss.get("play_vid_week"):
             st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title_week[:50]}</div>",
                         unsafe_allow_html=True)
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid_week}")
-            st.caption("點播放器右下角可全螢幕；點 YouTube 標誌可前往頻道。")
+            st.caption("點播放器右下角可全螢幕。")
+            if ss.get("scroll_to_player"):
+                components.html(
+                    "<script>try{var d=window.parent.document;"
+                    "var t=d.getElementById('player-anchor');"
+                    "if(t){t.scrollIntoView({behavior:'smooth',block:'center'});}}catch(e){}</script>",
+                    height=0)
+                ss.scroll_to_player = False
 
 
 # ================ 🛒 採買清單 ================

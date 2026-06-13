@@ -113,3 +113,16 @@ def collect_week_recipes(grid: dict[tuple[str, str], list[dict]]) -> list[dict]:
     for dishes in grid.values():
         out.extend(dishes)
     return out
+
+
+def clear_week(supabase: Any, any_day: date) -> None:
+    """清空某週（週一~週日）所有已排的菜。"""
+    mon = week_start(any_day)
+    sun = mon + timedelta(days=6)
+    (
+        supabase.table("meal_plan")
+        .delete()
+        .gte("plan_date", str(mon))
+        .lte("plan_date", str(sun))
+        .execute()
+    )
