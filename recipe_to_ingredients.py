@@ -66,6 +66,37 @@ _YT_VIDEOS = "https://www.googleapis.com/youtube/v3/videos"
 # ──────────────────────────────────────────────────────────────────────────
 # 1. 搜尋菜餚  (search.list, 100 units/次 — 盡量讓使用者主動觸發,不要每次 rerun 都打)
 # ──────────────────────────────────────────────────────────────────────────
+def _ytdlp_search(query: str, max_results: int = 6) -> list[dict]:
+    """yt-dlp 免額度搜尋後備。"""
+    import yt_dlp
+    opts = {"quiet": True, "skip_download": True, "extract_flat": True,
+            "noprogress": True, "socket_timeout": 15}
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(f"ytsearch{max_results}:{query} 做法 食譜", download=False)
+    cards = []
+    for e in (info.get("entries") or []):
+        vid = e.get("id")
+        if not vid:
+            continue
+        cards.append({
+            "video_id": vid,
+            "title": e.get("title", "") or "",
+            "channel": e.get("channel") or e.get("uploader", "") or "",
+            "thumbnail_url": f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+            "url": f"https://www.youtube.com/watch?v={vid}",
+        })
+    return cards
+
+
+def _ytdlp_description(video_id: str) -> str:
+    """yt-dlp 抓描述後備（較慢）。"""
+    import yt_dlp
+    opts = {"quiet": True, "skip_download": True, "noprogress": True, "socket_timeout": 20}
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    return info.get("description", "") or ""
+
+
 def search_dishes(query: str, api_key: str, max_results: int = 6) -> list[dict]:
     """用菜名搜 YouTube,回傳縮圖卡片清單。"""
     params = {
@@ -89,6 +120,11 @@ def search_dishes(query: str, api_key: str, max_results: int = 6) -> list[dict]:
             time.sleep(min(_wait, 30))  # 指數退避 / 尊重 Retry-After
             continue
         break
+    if resp is not None and resp.status_code in (403, 429):
+        try:
+            return _ytdlp_search(query, max_results)
+        except Exception:
+            pass
     resp.raise_for_status()
     items = resp.json().get("items", [])
 
@@ -118,6 +154,11 @@ def fetch_description(video_id: str, api_key: str) -> str:
     """取得影片完整描述(食材表通常藏在這)。"""
     params = {"part": "snippet", "id": video_id, "key": api_key}
     resp = requests.get(_YT_VIDEOS, params=params, timeout=10)
+    if resp.status_code in (403, 429):
+        try:
+            return _ytdlp_description(video_id)
+        except Exception:
+            pass
     resp.raise_for_status()
     items = resp.json().get("items", [])
     if not items:
