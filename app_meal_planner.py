@@ -810,7 +810,7 @@ with tab_week:
                         try:
                             rec = R.get_or_build_by_name(
                                 name, yt_api_key=YT_KEY, anthropic_client=claude,
-                                supabase=supabase, throttle=0.4)
+                                supabase=supabase, throttle=1.2)
                             if not rec:
                                 fails.append(f"{name}：找不到對應影片")
                             else:
@@ -832,6 +832,36 @@ with tab_week:
                         st.balloons()
                     if fails:
                         st.warning("有 {} 道沒加成功（顯示前 5 個）：\n\n{}".format(len(fails), "\n".join(fails[:5])))
+
+        with st.expander("🔧 進階：預建菜色快取（一次性，解 429）"):
+            st.caption("把所有內建菜色的搜尋結果一次存進快取；跑完後一鍵生成就走快取、"
+                       "不再打 YouTube、也不會再 429。約 50 道、需 1–2 分鐘，已在快取的會自動跳過。")
+            if st.button("開始預建快取", key="warm_cache"):
+                alln = sorted({n for lst in CUISINE_DISHES.values() for (n, _l, _h) in lst})
+                todo = [n for n in alln if not R.get_cached_video_id(supabase, n)]
+                if not todo:
+                    st.success("全部菜色都已在快取中，無需預建 🎉")
+                else:
+                    pw = st.progress(0.0, text="預建中…")
+                    ok = 0
+                    bad = []
+                    for wi, wn in enumerate(todo):
+                        pw.progress(wi / len(todo), text=f"預建：{wn}（{wi + 1}/{len(todo)}）")
+                        try:
+                            wr = R.get_or_build_by_name(wn, yt_api_key=YT_KEY,
+                                                        anthropic_client=claude,
+                                                        supabase=supabase, throttle=1.5)
+                            if wr:
+                                ok += 1
+                            else:
+                                bad.append(wn)
+                        except Exception as we:
+                            bad.append(f"{wn}：{str(we)[:40]}")
+                    pw.progress(1.0, text="完成")
+                    st.success(f"已預建 {ok} 道進快取。")
+                    if bad:
+                        st.warning("有 {} 道仍失敗（多半是 429，稍等片刻再按一次即可，"
+                                   "已成功的會跳過）：\n\n{}".format(len(bad), "\n".join(str(b) for b in bad[:10])))
 
         if ss.get("_confirm_clear"):
             st.warning("確定要清空本週所有已排的菜嗎？此動作無法復原。")

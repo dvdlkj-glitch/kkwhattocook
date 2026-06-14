@@ -78,10 +78,15 @@ def search_dishes(query: str, api_key: str, max_results: int = 6) -> list[dict]:
         "key": api_key,
     }
     resp = None
-    for _attempt in range(4):
+    for _attempt in range(5):
         resp = requests.get(_YT_SEARCH, params=params, timeout=10)
         if resp.status_code in (429, 500, 503):
-            time.sleep(1.5 * (_attempt + 1))  # 限流/暫時性錯誤 → 退避後重試
+            _ra = resp.headers.get("Retry-After")
+            try:
+                _wait = float(_ra) if _ra else 2 ** _attempt
+            except (TypeError, ValueError):
+                _wait = 2 ** _attempt
+            time.sleep(min(_wait, 30))  # 指數退避 / 尊重 Retry-After
             continue
         break
     resp.raise_for_status()
