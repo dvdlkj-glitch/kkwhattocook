@@ -261,6 +261,39 @@ def save_video_id(supabase: Any, name: str, video_id: str) -> None:
         pass
 
 
+def get_candidates(supabase, name):
+    """讀 dish_candidates（prefetch 預存的多支候選），回傳 card list。"""
+    try:
+        res = (supabase.table("dish_candidates").select("*")
+               .eq("name", name).order("rank").execute())
+        out = []
+        for r in (res.data or []):
+            vid = r["video_id"]
+            out.append({"video_id": vid,
+                        "title": r.get("title", "") or "",
+                        "channel": r.get("channel", "") or "",
+                        "thumbnail_url": r.get("thumbnail_url", "") or f"https://i.ytimg.com/vi/{vid}/hqdefault.jpg",
+                        "url": f"https://www.youtube.com/watch?v={vid}"})
+        return out
+    except Exception:
+        return []
+
+
+def save_candidates(supabase, name, cards):
+    """把一次搜尋拿到的多支（最多 10）存進 dish_candidates。"""
+    try:
+        rows = []
+        for i, c in enumerate(cards[:10]):
+            rows.append({"name": name, "rank": i, "video_id": c["video_id"],
+                         "title": c.get("title", "") or "",
+                         "channel": c.get("channel", "") or "",
+                         "thumbnail_url": c.get("thumbnail_url", "") or ""})
+        if rows:
+            supabase.table("dish_candidates").upsert(rows, on_conflict="name,rank").execute()
+    except Exception:
+        pass
+
+
 def get_or_build_by_name(
     name: str,
     *,
@@ -282,10 +315,14 @@ def get_or_build_by_name(
         rec = get_cached_recipe(supabase, vid)
         if rec:
             return rec
-    q = f"{search_prefix} {name}".strip() if search_prefix else name
-    cards = search_dishes(q, yt_api_key, max_results=1)
-    if throttle:
-        time.sleep(throttle)
+    cards = get_candidates(supabase, name)
+    if not cards:
+        q = f"{search_prefix} {name}".strip() if search_prefix else name
+        cards = search_dishes(q, yt_api_key, max_results=10)  # 一次抓 10 支（同價 100u）
+        if throttle:
+            time.sleep(throttle)
+        if cards:
+            save_candidates(supabase, name, cards)
     if not cards:
         return None
     rec = get_or_build_recipe(
