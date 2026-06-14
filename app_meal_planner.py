@@ -247,7 +247,8 @@ footer{ visibility:hidden; }
 .pan-cat{ font-weight:700; color:#9A5570; font-size:.84rem; margin:8px 2px 2px; }
 .pan-ok{ display:inline-block; font-size:.82rem; font-weight:700; color:#1B7A4B; margin:2px 0; }
 .pan-miss{ font-size:.8rem; color:#A14B63; margin:2px 0 4px; }
-.pan-miss-ok{ color:#1B7A4B; font-weight:700; }</style>
+.pan-miss-ok{ color:#1B7A4B; font-weight:700; }
+.pan-guide{ font-size:.85rem; line-height:1.7; color:#7A3B55; background:#FFF0F6; border:1px dashed #F4A6C6; border-radius:12px; padding:9px 13px; margin:4px 0 10px; }</style>
 """, unsafe_allow_html=True)
 
 
@@ -635,35 +636,28 @@ with tab_find:
             "🌶 辛香料": ["辣椒", "九層塔", "香菜"],
             "🍚 主食": ["白飯", "麵條", "米粉", "河粉"],
         }
-        _pan_rows = MP.get_pantry(supabase)
-        _pan = [r["item"] for r in _pan_rows]
-        _pan_set = set(_pan)
+        _ALL_PRESET = [it for items in PANTRY_CATS.values() for it in items]
+
+        # 食材庫只在進頁時載入一次 → 之後點選純記憶體、不再每次連線（快很多）
+        if "pan_items" not in ss:
+            ss["pan_items"] = [r["item"] for r in MP.get_pantry(supabase)]
 
         with st.container(border=True):
             st.markdown("<div class='section-title' style='margin-top:0'>🧊 我的食材庫</div>",
                         unsafe_allow_html=True)
-            if _pan:
-                st.markdown("<div class='pan-have'>目前有 " + str(len(_pan)) + " 樣："
-                            + "、".join(_pan) + "</div>", unsafe_allow_html=True)
-            else:
-                st.caption("還沒加食材。點下面的標籤把家裡有的加進來 🌸")
-            st.caption("鹽油醬蒜薑蔥等常備調味料一律當作已有，不列入「還缺」。")
+            st.markdown(
+                "<div class='pan-guide'>🌸 <b>怎麼用</b>：① 點下面標籤勾出家裡有的食材"
+                "（可一次點多個）→ ② 下方切到 <b>🧊 用現有食材煮</b>"
+                " → ③ 挑一道按 <b>➕ 排入</b> → ④ 到最上面 <b>📅 一週餐表</b> 分頁就能看到囉！</div>",
+                unsafe_allow_html=True)
 
-            for _cat, _items in PANTRY_CATS.items():
-                st.markdown(f"<div class='pan-cat'>{_cat}</div>", unsafe_allow_html=True)
-                _pc = st.columns(6)
-                for _j, _it in enumerate(_items):
-                    _on = _it in _pan_set
-                    with _pc[_j % 6]:
-                        if st.button(("✓ " if _on else "") + _it,
-                                     key=f"pan_{_cat}_{_it}",
-                                     type=("primary" if _on else "secondary"),
-                                     use_container_width=True):
-                            if _on:
-                                MP.remove_pantry(supabase, _it)
-                            else:
-                                MP.add_pantry(supabase, _it, _cat)
-                            st.rerun()
+            _picked = []
+            for _ci, (_cat, _items) in enumerate(PANTRY_CATS.items()):
+                _cur = set(ss["pan_items"])
+                _sel = st.pills(_cat, _items, selection_mode="multi",
+                                default=[it for it in _items if it in _cur],
+                                key=f"pan_pills_{_ci}")
+                _picked.extend(_sel or [])
 
             _ac1, _ac2 = st.columns([3, 1])
             with _ac1:
@@ -671,17 +665,50 @@ with tab_find:
                                      placeholder="例：芹菜、鯧魚、年糕…",
                                      label_visibility="collapsed")
             with _ac2:
-                if st.button("➕ 加入", key="pan_add_btn", use_container_width=True):
-                    if _new.strip():
-                        MP.add_pantry(supabase, _new.strip(), "自訂")
-                        st.rerun()
-            if _pan and st.button("🧹 清空食材庫", key="pan_clear"):
+                _add = st.button("➕ 加入", key="pan_add_btn", use_container_width=True)
+            _clear = bool(ss["pan_items"]) and st.button("🧹 清空食材庫", key="pan_clear")
+
+            if _clear:
+                for _ci in range(len(PANTRY_CATS)):
+                    ss.pop(f"pan_pills_{_ci}", None)
+                ss.pop("pan_new", None)
                 MP.clear_pantry(supabase)
+                ss["pan_items"] = []
+                st.toast("食材庫已清空", icon="🧹")
                 st.rerun()
+
+            _custom = [it for it in ss["pan_items"] if it not in _ALL_PRESET]
+            _target = list(dict.fromkeys(_picked + _custom))
+            _did_add = False
+            if _add and _new.strip() and _new.strip() not in _target:
+                _target.append(_new.strip())
+                _did_add = True
+
+            _old, _newset = set(ss["pan_items"]), set(_target)
+            if _old != _newset:
+                for _it in (_newset - _old):
+                    _cat0 = next((c for c, its in PANTRY_CATS.items() if _it in its), "自訂")
+                    MP.add_pantry(supabase, _it, _cat0)
+                for _it in (_old - _newset):
+                    MP.remove_pantry(supabase, _it)
+                ss["pan_items"] = _target
+            if _did_add:
+                ss.pop("pan_new", None)
+                st.toast(f"已加入 {_new.strip()}", icon="🧺")
+                st.rerun()
+
+            _pan = ss["pan_items"]
+            if _pan:
+                st.markdown("<div class='pan-have'>🧺 目前有 " + str(len(_pan)) + " 樣："
+                            + "、".join(_pan) + "</div>", unsafe_allow_html=True)
+            else:
+                st.caption("還沒勾食材，先點幾個吧 🌸")
+            st.caption("💡 鹽油醬蒜薑蔥等常備調味料一律當作已有，不列入「還缺」。")
 
         # ── 推薦模式切換 ─────────────────────────────────────
         _mode = st.radio("推薦方式", ["🎲 隨機精選", "🧊 用現有食材煮"],
                          horizontal=True, key="rec_mode", label_visibility="collapsed")
+        st.caption("🎲 隨機精選＝每類給 5 道靈感　·　🧊 用現有食材煮＝依你勾的食材排出最能煮的菜")
 
         def _render_rec_row(cz, dishes):
             _cols = st.columns(5)
@@ -705,7 +732,8 @@ with tab_find:
                                             supabase=supabase, search_prefix=CUISINE_KW.get(cz, ""))
                                         if _rec:
                                             MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
-                                            st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}")
+                                            st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}　👉 到「📅 一週餐表」看")
+                                            st.toast("已排入！", icon="✅")
                                         else:
                                             st.error("找不到對應影片，換一道試試。")
                                     except Exception as _e:
@@ -716,8 +744,10 @@ with tab_find:
                 st.info("先在上面「🧊 我的食材庫」加一些食材，這裡就會推薦你能煮的菜 🌸")
             else:
                 _only = st.checkbox("只看缺 ≤ 1 樣", key="pan_only_close")
-                _recs = R.recommend_by_pantry(
-                    supabase, [n for (n, _l, _h) in CUISINE_DISHES["全部"]], _pan, max_results=24)
+                if "pan_index" not in ss:
+                    ss["pan_index"] = R.load_pantry_index(
+                        supabase, [n for (n, _l, _h) in CUISINE_DISHES["全部"]])
+                _recs = R.score_by_pantry(ss["pan_index"], _pan, max_results=24)
                 if _only:
                     _recs = [r for r in _recs if (r["total"] - r["have"]) <= 1]
                 st.markdown(
@@ -758,7 +788,8 @@ with tab_find:
                                                 supabase=supabase)
                                             if _rec:
                                                 MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
-                                                st.success(f"已排入 {_d} {_sl}：{_nm}")
+                                                st.success(f"已排入 {_d} {_sl}：{_nm}　👉 到上面「📅 一週餐表」分頁看")
+                                                st.toast(f"{_nm} 已排入！", icon="✅")
                                             else:
                                                 st.error("找不到影片，換一道試試。")
                                         except Exception as _e:

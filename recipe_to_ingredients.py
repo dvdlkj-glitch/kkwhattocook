@@ -571,3 +571,53 @@ def recommend_by_pantry(supabase: Any, dish_names: list[str],
         })
     out.sort(key=lambda d: (d["coverage"], d["have"]), reverse=True)
     return out[:max_results]
+
+# ── 食材推薦：把資料載入與評分拆開，讓 UI 點選時純記憶體運算（零連線）──────
+def load_pantry_index(supabase: Any, dish_names: list[str]) -> dict:
+    """一次把候選菜的食材撈出來建索引：{name: {video_id, core[]}}。core 已濾掉常備調味料。"""
+    names = list(dict.fromkeys(dish_names))
+    try:
+        lk = (supabase.table("dish_lookup")
+              .select("name,video_id").in_("name", names).execute())
+        name2vid = {r["name"]: r["video_id"] for r in (lk.data or []) if r.get("video_id")}
+        vids = list({v for v in name2vid.values()})
+        vid2ing = {}
+        if vids:
+            rec = (supabase.table("recipes")
+                   .select("video_id,ingredients").in_("video_id", vids).execute())
+            vid2ing = {r["video_id"]: (r.get("ingredients") or []) for r in (rec.data or [])}
+    except Exception:
+        return {}
+    index = {}
+    for nm in names:
+        vid = name2vid.get(nm)
+        ings = vid2ing.get(vid) if vid else None
+        if not ings:
+            continue
+        core = [i for i in ings if not _ing_is_staple(i)]
+        if core:
+            index[nm] = {"video_id": vid, "core": core}
+    return index
+
+
+def score_by_pantry(index: dict, pantry_items: list[str], *, max_results: int = 24) -> list[dict]:
+    """純記憶體：用 index + 現有食材算吻合度排序。不連線。"""
+    pantry_items = [p.strip() for p in (pantry_items or []) if p and p.strip()]
+    if not pantry_items or not index:
+        return []
+    out = []
+    for nm, d in index.items():
+        core = d["core"]
+        have, missing = [], []
+        for i in core:
+            (have if _ing_covered(i, pantry_items) else missing).append(
+                i.get("name_norm") or i.get("name") or "")
+        total = len(core)
+        out.append({
+            "name": nm, "video_id": d["video_id"],
+            "have": len(have), "total": total,
+            "missing": [m for m in missing if m],
+            "coverage": (len(have) / total) if total else 0.0,
+        })
+    out.sort(key=lambda d: (d["coverage"], d["have"]), reverse=True)
+    return out[:max_results]
