@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "meal-planner",
+      "runtimeExecutable": "streamlit",
+      "runtimeArgs": ["run", "app_meal_planner.py", "--server.headless", "true", "--server.port", "8535"],
+      "port": 8535
+    }
+  ]
+}

@@ -97,7 +97,17 @@ html, body, [class*="css"]{ font-family:'Noto Sans TC','Plus Jakarta Sans',sans-
     linear-gradient(180deg,var(--bg-1) 0%,var(--bg-2) 45%,var(--bg-3) 100%);
   background-attachment:fixed;
 }
-.block-container{ max-width:1180px; padding-top:1rem; }
+/* 內容主欄＝霧面玻璃面板：影片在兩側留白與面板後方透出，文字始終落在可讀表面上 */
+.block-container{
+  max-width:1180px; padding:1.4rem 1.6rem 3rem; margin-top:1rem; margin-bottom:2rem;
+  background:rgba(255,250,252,.58);
+  backdrop-filter:blur(8px) saturate(1.06); -webkit-backdrop-filter:blur(8px) saturate(1.06);
+  border:1px solid rgba(255,255,255,.55); border-radius:24px;
+  box-shadow:0 20px 54px rgba(150,70,100,.20);
+}
+/* 讓頂部工具列透明，影片可延伸到最上方 */
+[data-testid="stHeader"]{ background:transparent !important; }
+[data-testid="stToolbar"]{ right:8px; }
 
 @keyframes floatUp{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
 @keyframes shimmer{ 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
@@ -126,8 +136,12 @@ div[data-testid="stVerticalBlockBorderWrapper"]{
 .pkg-card:hover{ transform:translateY(-4px); box-shadow:0 16px 34px rgba(180,90,120,.22); }
 .day-card{ padding:12px; margin-bottom:8px; }
 
-.section-title{ font-size:1.18rem; font-weight:900; color:var(--plum);
-  margin:8px 0 12px; display:flex; align-items:center; gap:8px; }
+.section-title{ font-size:1.18rem; font-weight:900; color:#7E3A55;
+  margin:8px 0 12px; display:flex; align-items:center; gap:8px;
+  text-shadow:0 1px 0 rgba(255,255,255,.65); }
+/* 小字說明：加深顏色，避免在影片＋玻璃面板上顯得太淡 */
+div[data-testid="stCaptionContainer"], div[data-testid="stCaptionContainer"] *{
+  color:#8A5970 !important; }
 .section-title::before{ content:''; width:6px; height:20px; border-radius:6px;
   background:linear-gradient(var(--pink-1),var(--pink-2)); display:inline-block; }
 
