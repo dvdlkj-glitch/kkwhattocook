@@ -46,6 +46,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections import defaultdict
 from typing import Any
 
@@ -76,7 +77,13 @@ def search_dishes(query: str, api_key: str, max_results: int = 6) -> list[dict]:
         "relevanceLanguage": "zh-Hant",
         "key": api_key,
     }
-    resp = requests.get(_YT_SEARCH, params=params, timeout=10)
+    resp = None
+    for _attempt in range(4):
+        resp = requests.get(_YT_SEARCH, params=params, timeout=10)
+        if resp.status_code in (429, 500, 503):
+            time.sleep(1.5 * (_attempt + 1))  # 限流/暫時性錯誤 → 退避後重試
+            continue
+        break
     resp.raise_for_status()
     items = resp.json().get("items", [])
 
@@ -188,6 +195,58 @@ def get_cached_recipe(supabase: Any, video_id: str) -> dict | None:
 
 def save_recipe(supabase: Any, record: dict) -> None:
     supabase.table("recipes").upsert(record, on_conflict="video_id").execute()
+
+
+def get_cached_video_id(supabase: Any, name: str) -> str | None:
+    """菜名 → video_id 快取（dish_lookup 表）。命中就完全免打 YouTube。"""
+    try:
+        res = supabase.table("dish_lookup").select("video_id").eq("name", name).execute()
+        rows = res.data or []
+        return rows[0]["video_id"] if rows else None
+    except Exception:
+        return None
+
+
+def save_video_id(supabase: Any, name: str, video_id: str) -> None:
+    try:
+        supabase.table("dish_lookup").upsert(
+            {"name": name, "video_id": video_id}, on_conflict="name").execute()
+    except Exception:
+        pass
+
+
+def get_or_build_by_name(
+    name: str,
+    *,
+    yt_api_key: str,
+    anthropic_client: Any,
+    supabase: Any,
+    model: str = DEFAULT_MODEL,
+    search_prefix: str = "",
+    throttle: float = 0.0,
+) -> dict | None:
+    """
+    依菜名取得完整 recipe。
+    先查 dish_lookup → recipes 快取（命中則完全不打 YouTube）；
+    沒有才搜 YouTube、抽食材，並把菜名→video_id 寫回快取。
+    回傳 recipe dict，找不到時回 None。
+    """
+    vid = get_cached_video_id(supabase, name)
+    if vid:
+        rec = get_cached_recipe(supabase, vid)
+        if rec:
+            return rec
+    q = f"{search_prefix} {name}".strip() if search_prefix else name
+    cards = search_dishes(q, yt_api_key, max_results=1)
+    if throttle:
+        time.sleep(throttle)
+    if not cards:
+        return None
+    rec = get_or_build_recipe(
+        cards[0], yt_api_key=yt_api_key,
+        anthropic_client=anthropic_client, supabase=supabase, model=model)
+    save_video_id(supabase, name, rec["video_id"])
+    return rec
 
 
 def get_or_build_recipe(

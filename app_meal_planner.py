@@ -15,6 +15,7 @@ import urllib.request
 import tempfile
 import datetime
 import random
+import time
 from collections import defaultdict
 from datetime import date, timedelta
 
@@ -601,14 +602,11 @@ with tab_find:
                         if st.button("✅ 確認排入", key=f"rcf_{_cz}_{_i}", use_container_width=True):
                             with st.spinner(f"從 YouTube 找「{_name}」並抽食材…"):
                                 try:
-                                    _cards = R.search_dishes(
-                                        (CUISINE_KW.get(_cz, "") + " " + _name).strip(),
-                                        YT_KEY, max_results=1)
-                                    if _cards:
-                                        _rec = R.get_or_build_recipe(
-                                            _cards[0], yt_api_key=YT_KEY,
-                                            anthropic_client=claude, supabase=supabase)
-                                        MP.add_to_plan(supabase, _d, _sl, _cards[0]["video_id"])
+                                    _rec = R.get_or_build_by_name(
+                                        _name, yt_api_key=YT_KEY, anthropic_client=claude,
+                                        supabase=supabase, search_prefix=CUISINE_KW.get(_cz, ""))
+                                    if _rec:
+                                        MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
                                         st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}")
                                     else:
                                         st.error("找不到對應影片，換一道試試。")
@@ -810,20 +808,21 @@ with tab_week:
                         used_names.add(name)
                         prog.progress(done / len(jobs), text=f"搜尋：{name}")
                         try:
-                            cards = R.search_dishes(name, YT_KEY, max_results=1)
-                            if cards:
-                                vid = cards[0]["video_id"]
+                            rec = R.get_or_build_by_name(
+                                name, yt_api_key=YT_KEY, anthropic_client=claude,
+                                supabase=supabase, throttle=0.4)
+                            if not rec:
+                                fails.append(f"{name}：找不到對應影片")
+                            else:
+                                vid = rec["video_id"]
                                 if vid in used_vids:
                                     fails.append(f"{name}：與已排重複，略過")
+                                elif gen_skin and ingredients_have_trigger(rec.get("ingredients")):
+                                    fails.append(f"{name}：含發物已略過")
                                 else:
-                                    rec = R.get_or_build_recipe(cards[0], yt_api_key=YT_KEY,
-                                                                anthropic_client=claude, supabase=supabase)
-                                    if gen_skin and ingredients_have_trigger(rec.get("ingredients")):
-                                        fails.append(f"{name}：含發物已略過")
-                                    else:
-                                        MP.add_to_plan(supabase, day, slot, vid)
-                                        used_vids.add(vid)
-                                        added += 1
+                                    MP.add_to_plan(supabase, day, slot, vid)
+                                    used_vids.add(vid)
+                                    added += 1
                         except Exception as e:
                             fails.append(f"{name}：{e}")
                         done += 1
