@@ -30,6 +30,7 @@ from recipes_data import (
 )
 import recipe_to_ingredients as R
 import meal_plan as MP
+import market_compare as MC
 
 st.set_page_config(page_title="今天煮什麼？亞庇買菜煮飯小幫手",
                    page_icon="🌸", layout="wide")
@@ -53,6 +54,27 @@ try:
 except Exception:
     claude = supabase = YT_KEY = None
     CLIENTS_OK = False
+
+
+def _bump_visits(supabase):
+    """每個 session 記一筆造訪，回傳 (累計, 今日)。"""
+    if supabase is None:
+        return None, None
+    try:
+        if not st.session_state.get("_visit_logged"):
+            import uuid
+            supabase.table("visits").insert(
+                {"session_id": str(uuid.uuid4())[:12]}).execute()
+            st.session_state["_visit_logged"] = True
+        total = supabase.table("visits").select(
+            "id", count="exact").limit(1).execute().count
+        import datetime as _dt
+        t0 = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
+        today = supabase.table("visits").select(
+            "id", count="exact").gte("ts", t0).limit(1).execute().count
+        return total, today
+    except Exception:
+        return None, None
 
 
 # ---------------------------------------------------------------- 主題 CSS
@@ -482,6 +504,14 @@ HERO_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
 </script></body></html>"""
 components.html(HERO_HTML, height=215)
 
+_vt, _vd = _bump_visits(supabase)
+if _vt:
+    _td = f" · 今日 {_vd}" if _vd is not None else ""
+    st.markdown(
+        f"<div style='text-align:right;color:#B86B86;font-size:.82rem;"
+        f"margin:-6px 6px 2px 0;'>👀 累計造訪 {_vt:,} 次{_td}</div>",
+        unsafe_allow_html=True)
+
 if not CLIENTS_OK:
     st.error("⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
              "市場行情與樂齡專區仍可使用，但「找菜／餐表／採買清單」需要設定 Secrets。")
@@ -519,6 +549,19 @@ with tab_market:
     except Exception:
         st.warning("📡 官方月度數據暫時無法載入（來源網站忙碌），請稍後重新整理頁面。"
                    "下方為麗都市場參考行情。")
+
+    st.markdown("<div class='section-title'>🌏 三地市場對比：亞庇 · 吉隆坡 · 台北</div>",
+                unsafe_allow_html=True)
+    try:
+        with st.spinner("正在載入三地對比（首次稍久）…"):
+            cdf, cmeta = MC.fetch_compare()
+        st.dataframe(cdf, use_container_width=True, hide_index=True)
+        st.caption(
+            f"亞庇／吉隆坡：PriceCatcher 官方零售價（{cmeta['month']}；KK {cmeta['kk_n']} 家、KL {cmeta['kl_n']} 家中位價）。"
+            f"台北：台灣農業部農產品批發行情，以即時匯率 1 TWD≈{cmeta['rate']:.3f} RM 換算"
+            "（批發價通常低於零售，僅供跨國參考）。雞肉／雞蛋／海鮮在台灣屬畜漁產、不在此農產批發資料，故台北欄留空。")
+    except Exception as _ce:
+        st.info(f"三地對比資料暫時無法取得（{_ce}）。")
 
     st.markdown("<div class='section-title'>🐟 麗都市場海鮮參考行情（RM / 公斤）</div>",
                 unsafe_allow_html=True)
