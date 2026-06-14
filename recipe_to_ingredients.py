@@ -469,3 +469,105 @@ def build_shopping_list(recipes: list[dict]) -> dict[str, list[dict]]:
 #         for it in items:
 #             st.write(f"☐ {it['name']} — {it['amount']}  ·來自 {', '.join(it['from'])}")
 # ──────────────────────────────────────────────────────────────────────────
+
+# ──────────────────────────────────────────────────────────────────────────
+# 依「現有食材」推薦菜色（吻合度排序）—— 完全讀快取，零 YouTube 額度
+# ──────────────────────────────────────────────────────────────────────────
+# 常備調味料：一律當作「已有」，不列入缺料（讓推薦更準）
+STAPLES = {
+    "鹽", "鹽巴", "糖", "冰糖", "油", "食用油", "沙拉油", "醬油", "醬油膏",
+    "蒜", "蒜頭", "蒜末", "薑", "薑末", "蔥", "青蔥", "蔥花", "水", "清水",
+    "胡椒", "白胡椒", "黑胡椒", "米酒", "料酒", "蠔油", "香油", "麻油",
+    "太白粉", "玉米粉", "味精", "雞粉", "雞精", "醋", "白醋", "烏醋",
+}
+# 同義詞：使用者選的食材 → 視為命中的關鍵字（抓部位/別名）
+PANTRY_SYNONYMS = {
+    "雞肉": ["雞肉", "雞胸", "雞腿", "雞翅", "土雞", "雞排", "去骨雞", "雞"],
+    "豬肉": ["豬肉", "五花", "梅花", "里肌", "絞肉", "排骨", "豬"],
+    "牛肉": ["牛肉", "牛腩", "牛排", "牛"],
+    "魚": ["魚", "鮭", "鯛", "鱸", "鯖", "甘望"],
+    "蝦": ["蝦"],
+    "雞蛋": ["雞蛋", "蛋"],
+    "豆腐": ["豆腐"],
+    "番茄": ["番茄", "蕃茄", "西紅柿"],
+    "洋蔥": ["洋蔥"],
+    "高麗菜": ["高麗菜", "包菜"],
+    "青菜": ["青菜", "青江", "小白菜", "菠菜", "空心菜", "地瓜葉", "莧菜"],
+    "馬鈴薯": ["馬鈴薯", "土豆"],
+    "紅蘿蔔": ["紅蘿蔔", "胡蘿蔔"],
+    "苦瓜": ["苦瓜"],
+    "茄子": ["茄子"],
+    "辣椒": ["辣椒"],
+    "九層塔": ["九層塔", "羅勒"],
+    "菇類": ["菇", "蘑菇", "香菇", "金針菇"],
+}
+
+
+def _ing_is_staple(ing: dict) -> bool:
+    nm = (ing.get("name_norm") or ing.get("name") or "").strip()
+    cat = (ing.get("category") or "").strip()
+    if cat in ("調味", "調味料"):
+        return True
+    return nm in STAPLES
+
+
+def _ing_covered(ing: dict, pantry_items: list[str]) -> bool:
+    nm = (ing.get("name_norm") or "").strip()
+    raw = (ing.get("name") or "").strip()
+    for p in pantry_items:
+        p = (p or "").strip()
+        if not p:
+            continue
+        toks = PANTRY_SYNONYMS.get(p, [p])
+        for t in toks:
+            if t and (t in nm or t in raw or (nm and nm in p)):
+                return True
+    return False
+
+
+def recommend_by_pantry(supabase: Any, dish_names: list[str],
+                        pantry_items: list[str], *, max_results: int = 24) -> list[dict]:
+    """
+    輸入候選菜名 + 現有食材，回傳依吻合度排序的清單：
+      [{name, video_id, have, total, missing[], coverage}, ...]
+    只讀 dish_lookup + recipes 快取，不打 YouTube。
+    """
+    pantry_items = [p.strip() for p in (pantry_items or []) if p and p.strip()]
+    if not pantry_items:
+        return []
+    names = list(dict.fromkeys(dish_names))
+    try:
+        lk = (supabase.table("dish_lookup")
+              .select("name,video_id").in_("name", names).execute())
+        name2vid = {r["name"]: r["video_id"] for r in (lk.data or []) if r.get("video_id")}
+        vids = list({v for v in name2vid.values()})
+        vid2ing = {}
+        if vids:
+            rec = (supabase.table("recipes")
+                   .select("video_id,ingredients").in_("video_id", vids).execute())
+            vid2ing = {r["video_id"]: (r.get("ingredients") or []) for r in (rec.data or [])}
+    except Exception:
+        return []
+
+    out = []
+    for nm in names:
+        vid = name2vid.get(nm)
+        ings = vid2ing.get(vid) if vid else None
+        if not ings:
+            continue
+        core = [i for i in ings if not _ing_is_staple(i)]
+        if not core:
+            continue
+        have, missing = [], []
+        for i in core:
+            (have if _ing_covered(i, pantry_items) else missing).append(
+                i.get("name_norm") or i.get("name") or "")
+        total = len(core)
+        out.append({
+            "name": nm, "video_id": vid,
+            "have": len(have), "total": total,
+            "missing": [m for m in missing if m],
+            "coverage": (len(have) / total) if total else 0.0,
+        })
+    out.sort(key=lambda d: (d["coverage"], d["have"]), reverse=True)
+    return out[:max_results]

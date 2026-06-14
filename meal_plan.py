@@ -126,3 +126,31 @@ def clear_week(supabase: Any, any_day: date) -> None:
         .lte("plan_date", str(sun))
         .execute()
     )
+
+# ──────────────────────────────────────────────────────────────────────────
+# 食材庫（pantry）CRUD —— 全家共用、persist 到 Supabase
+# ──────────────────────────────────────────────────────────────────────────
+def get_pantry(supabase: Any) -> list[dict]:
+    """回傳目前食材庫 [{item, category}, ...]（依加入時間）。"""
+    try:
+        res = (supabase.table("pantry")
+               .select("item,category").order("added_at").execute())
+        return res.data or []
+    except Exception:
+        return []
+
+
+def add_pantry(supabase: Any, item: str, category: str = "") -> None:
+    item = (item or "").strip()
+    if not item:
+        return
+    supabase.table("pantry").upsert(
+        {"item": item, "category": category}, on_conflict="item").execute()
+
+
+def remove_pantry(supabase: Any, item: str) -> None:
+    supabase.table("pantry").delete().eq("item", item).execute()
+
+
+def clear_pantry(supabase: Any) -> None:
+    supabase.table("pantry").delete().neq("item", "__none__").execute()

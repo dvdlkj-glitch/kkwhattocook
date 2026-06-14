@@ -241,7 +241,13 @@ footer{ visibility:hidden; }
 .cost-badge{ white-space:nowrap; }
 .day-card .cost-badge{ font-size:.76rem; padding:3px 8px; }
 .day-card .dish-mini{ height:2.4em; }
-</style>
+
+.rec-cat{ font-weight:800; color:#8E4560; margin:12px 2px 4px; font-size:.98rem; }
+.pan-have{ font-size:.86rem; color:#7A3B55; background:#FFE6F0; border-radius:10px; padding:6px 10px; margin:2px 0 6px; }
+.pan-cat{ font-weight:700; color:#9A5570; font-size:.84rem; margin:8px 2px 2px; }
+.pan-ok{ display:inline-block; font-size:.82rem; font-weight:700; color:#1B7A4B; margin:2px 0; }
+.pan-miss{ font-size:.8rem; color:#A14B63; margin:2px 0 4px; }
+.pan-miss-ok{ color:#1B7A4B; font-weight:700; }</style>
 """, unsafe_allow_html=True)
 
 
@@ -616,45 +622,169 @@ with tab_find:
             if ss.skin:
                 st.caption(SKIN_NOTE)
 
-        _cz = ss.cuisine
-        _pool = CUISINE_DISHES.get(_cz) or CUISINE_DISHES["全部"]
-        _rk = f"recs_{_cz}"
-        rc1, rc2 = st.columns([3, 1])
-        with rc1:
-            st.markdown(f"<div class='section-title'>🍴 為你精選 5 道【{_cz}】</div>",
-                        unsafe_allow_html=True)
-        with rc2:
-            _regen = st.button("🔄 換一批", key="regen_recs", use_container_width=True)
-        if _regen or _rk not in ss:
-            ss[_rk] = random.sample(_pool, min(5, len(_pool)))
-        _emojis = ["🍲", "🍛", "🥘", "🍜", "🥗", "🍳", "🐟", "🍗"]
         _f = people_factor(ss.get("people", 4))
-        _cols = st.columns(5)
-        for _i, (_name, _lo, _hi) in enumerate(ss[_rk]):
-            with _cols[_i % 5]:
-                with st.container(border=True):
-                    _fl = " ⚠" if (ss.get("skin") and name_has_trigger(_name)) else ""
-                    st.markdown(
-                        f"<div class='rec-emoji'>{_emojis[_i % len(_emojis)]}</div>"
-                        f"<div class='rec-name'>{_name}{_fl}</div>"
-                        f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
+        _emojis = ["🍲", "🍛", "🥘", "🍜", "🥗", "🍳", "🐟", "🍗"]
+        _cz = ss.cuisine
+
+        # ── 🧊 我的食材庫（管理）──────────────────────────────
+        PANTRY_CATS = {
+            "🥬 蔬菜": ["番茄", "洋蔥", "高麗菜", "青菜", "紅蘿蔔", "馬鈴薯",
+                       "苦瓜", "茄子", "玉米", "青椒", "菇類", "小黃瓜"],
+            "🍖 肉‧海鮮": ["雞肉", "豬肉", "牛肉", "蝦", "魚", "花枝"],
+            "🥚 蛋‧豆製": ["雞蛋", "豆腐", "豆乾", "油豆腐"],
+            "🌶 辛香料": ["辣椒", "九層塔", "香菜"],
+            "🍚 主食": ["白飯", "麵條", "米粉", "河粉"],
+        }
+        _pan_rows = MP.get_pantry(supabase)
+        _pan = [r["item"] for r in _pan_rows]
+        _pan_set = set(_pan)
+
+        with st.container(border=True):
+            st.markdown("<div class='section-title' style='margin-top:0'>🧊 我的食材庫</div>",
                         unsafe_allow_html=True)
-                    with st.popover("➕ 排入", use_container_width=True):
-                        _d = st.date_input("排到哪一天", value=date.today(), key=f"rd_{_cz}_{_i}")
-                        _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"rs_{_cz}_{_i}")
-                        if st.button("✅ 確認排入", key=f"rcf_{_cz}_{_i}", use_container_width=True):
-                            with st.spinner(f"從 YouTube 找「{_name}」並抽食材…"):
-                                try:
-                                    _rec = R.get_or_build_by_name(
-                                        _name, yt_api_key=YT_KEY, anthropic_client=claude,
-                                        supabase=supabase, search_prefix=CUISINE_KW.get(_cz, ""))
-                                    if _rec:
-                                        MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
-                                        st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}")
-                                    else:
-                                        st.error("找不到對應影片，換一道試試。")
-                                except Exception as _e:
-                                    st.error(f"排入失敗：{_e}")
+            if _pan:
+                st.markdown("<div class='pan-have'>目前有 " + str(len(_pan)) + " 樣："
+                            + "、".join(_pan) + "</div>", unsafe_allow_html=True)
+            else:
+                st.caption("還沒加食材。點下面的標籤把家裡有的加進來 🌸")
+            st.caption("鹽油醬蒜薑蔥等常備調味料一律當作已有，不列入「還缺」。")
+
+            for _cat, _items in PANTRY_CATS.items():
+                st.markdown(f"<div class='pan-cat'>{_cat}</div>", unsafe_allow_html=True)
+                _pc = st.columns(6)
+                for _j, _it in enumerate(_items):
+                    _on = _it in _pan_set
+                    with _pc[_j % 6]:
+                        if st.button(("✓ " if _on else "") + _it,
+                                     key=f"pan_{_cat}_{_it}",
+                                     type=("primary" if _on else "secondary"),
+                                     use_container_width=True):
+                            if _on:
+                                MP.remove_pantry(supabase, _it)
+                            else:
+                                MP.add_pantry(supabase, _it, _cat)
+                            st.rerun()
+
+            _ac1, _ac2 = st.columns([3, 1])
+            with _ac1:
+                _new = st.text_input("自己加", key="pan_new",
+                                     placeholder="例：芹菜、鯧魚、年糕…",
+                                     label_visibility="collapsed")
+            with _ac2:
+                if st.button("➕ 加入", key="pan_add_btn", use_container_width=True):
+                    if _new.strip():
+                        MP.add_pantry(supabase, _new.strip(), "自訂")
+                        st.rerun()
+            if _pan and st.button("🧹 清空食材庫", key="pan_clear"):
+                MP.clear_pantry(supabase)
+                st.rerun()
+
+        # ── 推薦模式切換 ─────────────────────────────────────
+        _mode = st.radio("推薦方式", ["🎲 隨機精選", "🧊 用現有食材煮"],
+                         horizontal=True, key="rec_mode", label_visibility="collapsed")
+
+        def _render_rec_row(cz, dishes):
+            _cols = st.columns(5)
+            for _i, (_name, _lo, _hi) in enumerate(dishes):
+                with _cols[_i % 5]:
+                    with st.container(border=True):
+                        _fl = " ⚠" if (ss.get("skin") and name_has_trigger(_name)) else ""
+                        st.markdown(
+                            f"<div class='rec-emoji'>{_emojis[_i % len(_emojis)]}</div>"
+                            f"<div class='rec-name'>{_name}{_fl}</div>"
+                            f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
+                            unsafe_allow_html=True)
+                        with st.popover("➕ 排入", use_container_width=True):
+                            _d = st.date_input("排到哪一天", value=date.today(), key=f"rd_{cz}_{_i}")
+                            _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"rs_{cz}_{_i}")
+                            if st.button("✅ 確認排入", key=f"rcf_{cz}_{_i}", use_container_width=True):
+                                with st.spinner(f"從 YouTube 找「{_name}」並抽食材…"):
+                                    try:
+                                        _rec = R.get_or_build_by_name(
+                                            _name, yt_api_key=YT_KEY, anthropic_client=claude,
+                                            supabase=supabase, search_prefix=CUISINE_KW.get(cz, ""))
+                                        if _rec:
+                                            MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
+                                            st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}")
+                                        else:
+                                            st.error("找不到對應影片，換一道試試。")
+                                    except Exception as _e:
+                                        st.error(f"排入失敗：{_e}")
+
+        if _mode.startswith("🧊"):
+            if not _pan:
+                st.info("先在上面「🧊 我的食材庫」加一些食材，這裡就會推薦你能煮的菜 🌸")
+            else:
+                _only = st.checkbox("只看缺 ≤ 1 樣", key="pan_only_close")
+                _recs = R.recommend_by_pantry(
+                    supabase, [n for (n, _l, _h) in CUISINE_DISHES["全部"]], _pan, max_results=24)
+                if _only:
+                    _recs = [r for r in _recs if (r["total"] - r["have"]) <= 1]
+                st.markdown(
+                    f"<div class='section-title'>🍳 用現有食材能煮（{len(_recs)} 道 · 吻合度排序）</div>",
+                    unsafe_allow_html=True)
+                if not _recs:
+                    st.warning("目前快取裡沒有吻合的菜。多加幾樣常見食材，或先用「🎲 隨機精選」把菜建進快取。")
+                _pcols = st.columns(4)
+                for _i, _r in enumerate(_recs):
+                    _nm = _r["name"]
+                    _lo, _hi = DISH_PRICE.get(_nm, (0, 0))
+                    _miss = _r["missing"]
+                    _full = (_r["have"] == _r["total"])
+                    with _pcols[_i % 4]:
+                        with st.container(border=True):
+                            _fl = " ⚠" if (ss.get("skin") and name_has_trigger(_nm)) else ""
+                            _badge = ("<span class='pan-ok'>✅ 有 %d/%d 食材%s</span>"
+                                      % (_r["have"], _r["total"], " 🎉" if _full else ""))
+                            if _miss:
+                                _need = ("<div class='pan-miss'>🛒 還缺："
+                                         + "、".join(_miss[:4])
+                                         + ("…" if len(_miss) > 4 else "") + "</div>")
+                            else:
+                                _need = "<div class='pan-miss pan-miss-ok'>全部都有！</div>"
+                            st.markdown(
+                                f"<div class='rec-name'>{_nm}{_fl}</div>"
+                                f"{_badge}{_need}"
+                                f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
+                                unsafe_allow_html=True)
+                            with st.popover("➕ 排入", use_container_width=True):
+                                _d = st.date_input("排到哪一天", value=date.today(), key=f"pd_{_i}")
+                                _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"ps_{_i}")
+                                if st.button("✅ 確認排入", key=f"pcf_{_i}", use_container_width=True):
+                                    with st.spinner(f"排入「{_nm}」…"):
+                                        try:
+                                            _rec = R.get_or_build_by_name(
+                                                _nm, yt_api_key=YT_KEY, anthropic_client=claude,
+                                                supabase=supabase)
+                                            if _rec:
+                                                MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
+                                                st.success(f"已排入 {_d} {_sl}：{_nm}")
+                                            else:
+                                                st.error("找不到影片，換一道試試。")
+                                        except Exception as _e:
+                                            st.error(f"排入失敗：{_e}")
+        else:
+            rc1, rc2 = st.columns([3, 1])
+            with rc1:
+                _hdr = ("🍴 為你精選（每大類各 5 道，可直接排入）"
+                        if _cz == "全部" else f"🍴 為你精選 5 道【{_cz}】")
+                st.markdown(f"<div class='section-title'>{_hdr}</div>", unsafe_allow_html=True)
+            with rc2:
+                _regen = st.button("🔄 換一批", key="regen_recs", use_container_width=True)
+            if _cz == "全部":
+                for _bcz in ["中式", "台式", "西式", "泰式", "馬來西亞", "印尼"]:
+                    _rk = f"recs_{_bcz}"
+                    if _regen or _rk not in ss:
+                        ss[_rk] = random.sample(CUISINE_DISHES[_bcz], 5)
+                    st.markdown(f"<div class='rec-cat'>🍽️ {_bcz}</div>", unsafe_allow_html=True)
+                    _render_rec_row(_bcz, ss[_rk])
+            else:
+                _rk = f"recs_{_cz}"
+                _pool = CUISINE_DISHES.get(_cz) or CUISINE_DISHES["全部"]
+                if _regen or _rk not in ss:
+                    ss[_rk] = random.sample(_pool, min(5, len(_pool)))
+                _render_rec_row(_cz, ss[_rk])
+
 
         st.markdown("<div class='section-title'>🔎 或自己搜尋</div>", unsafe_allow_html=True)
         query = st.text_input("輸入菜名", placeholder="例：麻婆豆腐、咖哩雞、番茄炒蛋")
