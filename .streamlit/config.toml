@@ -1,3 +1,7 @@
+[server]
+# 讓 ./static 內的檔案可由 app/static/<檔名> 取用（影片背景用）
+enableStaticServing = true
+
 [theme]
 base = "light"
 primaryColor = "#B4456A"

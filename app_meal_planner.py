@@ -252,6 +252,50 @@ footer{ visibility:hidden; }
 """, unsafe_allow_html=True)
 
 
+# ---------------------------------------------------------------- 影片背景（cooking background）
+# 影片放在 ./static/，由 Streamlit 靜態服務 app/static/ 提供；瀏覽器只下載一次並快取，
+# 不會隨每次 rerun 重傳。上方覆一層粉色半透明遮罩，確保原本粉色主題與文字仍清晰可讀。
+_BG_VIDEO_URL = "app/static/cooking_background.mp4"
+st.markdown("""
+<style>
+.stApp{ background:transparent !important; }
+#bg-video, #bg-video-tint{
+  position:fixed; inset:0; width:100vw; height:100vh; margin:0; padding:0;
+  border:0; pointer-events:none;
+}
+#bg-video{ object-fit:cover; z-index:-3; }
+#bg-video-tint{ z-index:-2;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(253,231,238,.42) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(253,244,246,.55) 0%, rgba(251,239,242,.45) 45%, rgba(247,232,238,.60) 100%);
+}
+</style>
+""", unsafe_allow_html=True)
+
+components.html(f"""
+<script>
+(function(){{
+  const doc = window.parent.document;
+  if (doc.getElementById('bg-video')) return;
+  const tint = doc.createElement('div');
+  tint.id = 'bg-video-tint';
+  doc.body.insertBefore(tint, doc.body.firstChild);
+  const v = doc.createElement('video');
+  v.id = 'bg-video';
+  v.src = '{_BG_VIDEO_URL}';
+  v.autoplay = true; v.loop = true; v.muted = true; v.defaultMuted = true;
+  v.playsInline = true;
+  v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+  v.setAttribute('preload', 'auto');
+  doc.body.insertBefore(v, doc.body.firstChild);
+  const tryPlay = () => v.play().catch(() => {{}});
+  tryPlay();
+  doc.addEventListener('click', tryPlay, {{ once: true }});
+}})();
+</script>
+""", height=0, width=0)
+
+
 # ---------------------------------------------------------------- 估價（本機推估）
 # 以「每道菜該食材的常見份量價」粗估，避開調味料；標示「估」。
 PRICE_PORTIONS = [
