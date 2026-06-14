@@ -1,0 +1,22 @@
+﻿# 機密：絕不上傳
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 暫存 / 工具產生
+_*.py
+_res.txt
+_e.txt
+_err.txt
+_pip.log
+*.log
+
+# 備份
+*_backup_*.py
+
+# OS
+.DS_Store
+Thumbs.db
