@@ -1,1 +1,25 @@
+﻿name: prefetch-meals
 
+on:
+  schedule:
+    - cron: "0 16 * * *"   # 16:00 UTC = 台灣 00:00，每天一次
+  workflow_dispatch: {}
+
+jobs:
+  prefetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -r requirements.txt
+      - name: Run prefetch
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PREFETCH_BUDGET: "25"
+        run: python prefetch_meals.py
