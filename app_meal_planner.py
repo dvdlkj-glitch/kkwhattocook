@@ -77,130 +77,155 @@ def _bump_visits(supabase):
         return None, None
 
 
-# ---------------------------------------------------------------- 主題 CSS
+# ---------------------------------------------------------------- 主題 CSS（暖米色 × 赤陶 編輯風）
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Plus+Jakarta+Sans:wght@600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap');
 
 :root{
-  --pink-1:#C2698A; --pink-2:#A8546F; --pink-3:#9C4D68;
-  --rose:#B4456A; --plum:#8E4560; --gold:#F4D9A6;
-  --bg-1:#FDF4F6; --bg-2:#FBEFF2; --bg-3:#F7E8EE;
-  --card:rgba(255,255,255,.72); --line:rgba(180,90,120,.18);
-  --shadow:0 8px 28px rgba(180,90,120,.14);
+  --ink:#2b211a; --terra:#c0492b; --terra-soft:#d9633f; --gold:#e7b04a;
+  --muted:#9b8b76; --muted2:#b39a6e; --muted3:#a2917b;
+  --bg-1:#f6efe4; --bg-2:#ece3d4;
+  --card:#fffdf8; --line:#ebe0cd; --line2:#e7dccb; --panel:#fbf5ea;
+  --green:#5c7a4a;
+  --shadow:0 4px 18px rgba(120,90,50,.07);
 }
 *{ -webkit-tap-highlight-color:transparent; }
-html, body, [class*="css"]{ font-family:'Noto Sans TC','Plus Jakarta Sans',sans-serif; }
+html, body, [class*="css"]{ font-family:'Noto Sans TC',system-ui,sans-serif; color:var(--ink); }
+.serif{ font-family:'Noto Serif TC',serif; }
 .stApp{
-  background:
-    radial-gradient(1200px 600px at 80% -10%, #FDE7EE 0%, transparent 60%),
-    linear-gradient(180deg,var(--bg-1) 0%,var(--bg-2) 45%,var(--bg-3) 100%);
+  background:#f6efe4;
+  background-image:
+    radial-gradient(circle at 12% -5%, #f4e7d2 0%, transparent 40%),
+    radial-gradient(circle at 90% 0%, #f0e3cf 0%, transparent 35%);
   background-attachment:fixed;
 }
-/* 內容主欄＝霧面玻璃面板：影片在兩側留白與面板後方透出，文字始終落在可讀表面上 */
+/* 內容主欄＝霧面米色面板：影片在兩側留白與面板後方透出，所有文字始終落在可讀表面上 */
 .block-container{
-  max-width:1180px; padding:1.4rem 1.6rem 3rem; margin-top:1rem; margin-bottom:2rem;
-  background:rgba(255,250,252,.58);
-  backdrop-filter:blur(8px) saturate(1.06); -webkit-backdrop-filter:blur(8px) saturate(1.06);
-  border:1px solid rgba(255,255,255,.55); border-radius:24px;
-  box-shadow:0 20px 54px rgba(150,70,100,.20);
+  max-width:1180px; padding:1.6rem 1.8rem 4rem; margin-top:1rem; margin-bottom:2rem;
+  background:rgba(248,242,232,.86);
+  backdrop-filter:blur(10px) saturate(1.05); -webkit-backdrop-filter:blur(10px) saturate(1.05);
+  border:1px solid rgba(255,255,255,.55); border-radius:26px;
+  box-shadow:0 24px 60px rgba(70,52,34,.22);
 }
-/* 讓頂部工具列透明，影片可延伸到最上方 */
 [data-testid="stHeader"]{ background:transparent !important; }
 [data-testid="stToolbar"]{ right:8px; }
 
-@keyframes floatUp{ from{opacity:0; transform:translateY(14px)} to{opacity:1; transform:none} }
-@keyframes shimmer{ 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+@keyframes floatUp{ from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none} }
 
-.hero{
-  background:linear-gradient(120deg,var(--pink-1),var(--pink-3),var(--pink-2));
-  background-size:200% 200%; animation:shimmer 14s ease infinite alternate;
-  border-radius:26px; padding:24px 28px; color:#FFF8F9;
-  box-shadow:0 18px 40px rgba(156,77,104,.32); position:relative; overflow:hidden;
-}
-.hero::after{ content:''; position:absolute; inset:0;
-  background:radial-gradient(420px 220px at 90% 0%, rgba(255,255,255,.22), transparent 70%); }
-.hero h1{ margin:0; font-size:1.7rem; font-weight:900; letter-spacing:.5px; }
-.hero p{ margin:8px 0 0; font-size:.9rem; opacity:.95; line-height:1.6; }
-.hero .gold{ color:var(--gold); font-weight:800; }
+/* ---------- 頂部品牌列 ---------- */
+.appbar{ display:flex; align-items:center; gap:14px; padding:6px 2px 16px;
+  border-bottom:1px solid var(--line2); margin-bottom:18px; }
+.appbar .logo{ width:38px; height:38px; border-radius:11px; background:var(--terra);
+  color:#fff; display:grid; place-items:center; font-family:'Noto Serif TC',serif;
+  font-weight:900; font-size:21px; }
+.appbar .brand{ line-height:1.05; }
+.appbar .brand .t{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:22px;
+  letter-spacing:.5px; color:var(--ink); }
+.appbar .brand .s{ font-size:11px; color:var(--muted); letter-spacing:2px; margin-top:3px;
+  text-transform:uppercase; }
 
+/* ---------- HERO ---------- */
+.hero{ position:relative; border-radius:22px; overflow:hidden; border:1px solid var(--line2);
+  min-height:230px; display:flex; align-items:flex-end; animation:floatUp .5s ease both;
+  background:#2b211a; }
+.hero img, .hero video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.hero .scrim{ position:absolute; inset:0;
+  background:linear-gradient(100deg,rgba(43,33,26,.90) 0%,rgba(43,33,26,.58) 48%,rgba(43,33,26,.12) 100%); }
+.hero .inner{ position:relative; padding:34px 32px; max-width:600px; }
+.hero .tag{ display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,.16);
+  border:1px solid rgba(255,255,255,.28); color:#fff; font-size:11px; letter-spacing:1.5px;
+  text-transform:uppercase; padding:5px 12px; border-radius:999px; margin-bottom:14px; }
+.hero h1{ font-family:'Noto Serif TC',serif; font-weight:900; font-size:2rem; line-height:1.2;
+  color:#fff; margin:0 0 10px; }
+.hero p{ color:rgba(255,255,255,.84); font-size:.92rem; line-height:1.65; margin:0 0 18px;
+  max-width:460px; }
+.hero .steps{ display:flex; gap:18px; flex-wrap:wrap; }
+.hero .step{ display:flex; align-items:center; gap:9px; color:#fff; font-size:.8rem; font-weight:500; }
+.hero .step .n{ width:28px; height:28px; border-radius:50%; background:#fff; color:var(--terra);
+  display:grid; place-items:center; font-weight:900; font-size:13px; font-family:'Noto Serif TC',serif; }
+.hero .gold{ color:var(--gold); font-weight:700; }
+
+/* ---------- 卡片 ---------- */
 .card,.day-card,.pkg-card,.stat,
 div[data-testid="stVerticalBlockBorderWrapper"]{
-  background:var(--card); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-  border:1px solid var(--line)!important; border-radius:20px;
-  box-shadow:var(--shadow); animation:floatUp .5s ease both;
+  background:var(--card); border:1px solid var(--line)!important; border-radius:18px;
+  box-shadow:var(--shadow); animation:floatUp .4s ease both;
 }
-.card{ padding:16px 18px; margin-bottom:14px; }
-.pkg-card{ padding:10px 10px 8px; text-align:center;
-  transition:transform .18s ease, box-shadow .18s ease; }
-.pkg-card:hover{ transform:translateY(-4px); box-shadow:0 16px 34px rgba(180,90,120,.22); }
+.card{ padding:18px 20px; margin-bottom:14px; line-height:1.7; }
+.pkg-card{ padding:10px 10px 8px; text-align:center; transition:transform .18s ease, box-shadow .18s ease; }
+.pkg-card:hover{ transform:translateY(-3px); box-shadow:0 12px 28px rgba(120,90,50,.14); }
 .day-card{ padding:12px; margin-bottom:8px; }
 
-.section-title{ font-size:1.18rem; font-weight:900; color:#7E3A55;
-  margin:8px 0 12px; display:flex; align-items:center; gap:8px;
-  text-shadow:0 1px 0 rgba(255,255,255,.65); }
-/* 小字說明：加深顏色，避免在影片＋玻璃面板上顯得太淡 */
+.section-title{ font-family:'Noto Serif TC',serif; font-size:1.5rem; font-weight:900; color:var(--ink);
+  margin:6px 0 14px; display:flex; align-items:center; gap:10px; }
+.section-title::before{ content:''; width:5px; height:24px; border-radius:6px;
+  background:var(--terra); display:inline-block; }
 div[data-testid="stCaptionContainer"], div[data-testid="stCaptionContainer"] *{
-  color:#8A5970 !important; }
-.section-title::before{ content:''; width:6px; height:20px; border-radius:6px;
-  background:linear-gradient(var(--pink-1),var(--pink-2)); display:inline-block; }
+  color:var(--muted) !important; }
 
-.meal-name,.dish-mini{ color:#6E3B4E; font-weight:700; line-height:1.4; }
-.dish-mini{ font-size:.84rem; min-height:2.3em; margin-top:4px; }
-.pkg-title{ font-weight:800; color:var(--plum); margin-top:8px; font-size:.92rem;
+.meal-name,.dish-mini{ font-family:'Noto Serif TC',serif; color:var(--ink); font-weight:700; line-height:1.3; }
+.dish-mini{ font-size:.9rem; min-height:2.3em; margin-top:4px; }
+.pkg-title{ font-weight:700; color:var(--ink); margin-top:8px; font-size:.92rem;
   line-height:1.35; min-height:2.4em; }
-.pkg-desc{ font-size:.74rem; color:#A0728B; margin-top:2px; }
-.yt-thumb{ width:100%; height:128px; object-fit:cover; border-radius:14px; display:block;
-  box-shadow:0 6px 16px rgba(180,90,120,.16); }
+.pkg-desc{ font-size:.74rem; color:var(--muted3); margin-top:2px; }
+.yt-thumb{ width:100%; height:128px; object-fit:cover; border-radius:12px; display:block; }
 
-.cost-badge{ display:inline-block; background:linear-gradient(120deg,#FBE9EE,#FCE0EA);
-  color:var(--rose); font-weight:800; font-size:.84rem; border-radius:10px;
-  padding:4px 11px; margin-top:7px; }
+.cost-badge{ display:inline-block; background:transparent;
+  color:var(--terra); font-weight:700; font-size:.86rem; padding:2px 0; margin-top:7px; }
 .day-head{ display:flex; justify-content:space-between; align-items:center;
-  font-weight:900; color:var(--plum); font-size:1rem; margin-bottom:8px; }
-.day-cost{ background:#FBE9EE; color:var(--rose); font-size:.74rem; font-weight:800;
-  border-radius:999px; padding:2px 10px; }
-.slot-label{ font-size:.82rem; font-weight:800; color:var(--pink-2); margin:8px 0 2px; }
-.warn-flag{ color:#C77; font-size:.72rem; }
+  font-family:'Noto Serif TC',serif; font-weight:700; color:var(--ink); font-size:1.05rem; margin-bottom:8px; }
+.day-cost{ background:var(--panel); color:var(--muted); font-size:.74rem; font-weight:700;
+  border-radius:999px; padding:3px 11px; border:1px solid var(--line); }
+.slot-label{ font-size:.7rem; font-weight:700; color:var(--muted2); margin:10px 0 2px;
+  letter-spacing:1px; text-transform:uppercase; }
+.warn-flag{ color:var(--terra); font-size:.72rem; }
 .day-divider{ border-top:1.5px dashed var(--line); margin:10px 0 8px; }
 .meal-tag{ display:inline-block; font-size:.72rem; font-weight:700; padding:2px 10px;
   border-radius:999px; margin-bottom:6px; }
-.tag-lunch{ background:#FCEEDF; color:#A6731F; } .tag-dinner{ background:#EFE0F0; color:#7B4E86; }
-.chip{ display:inline-block; background:#F7F0EA; color:#8A6A52; border-radius:999px;
-  font-size:.72rem; padding:2px 9px; margin:2px; }
-.note{ font-size:.78rem; color:#9A7C5B; background:#FDF7EC; border-left:3px solid #DDB877;
-  border-radius:8px; padding:6px 10px; margin-top:8px; }
-.emoji-hero{ font-size:2.4rem; text-align:center; background:#FBEFF2; border-radius:14px;
+.tag-lunch{ background:#f7eede; color:#a6731f; } .tag-dinner{ background:#efe7d6; color:#7a5a3f; }
+.chip{ display:inline-block; background:var(--panel); color:#7a5a3f; border-radius:999px;
+  font-size:.72rem; padding:2px 9px; margin:2px; border:1px solid var(--line); }
+.note{ font-size:.82rem; color:#5f5141; background:var(--panel); border-left:3px solid var(--terra);
+  border-radius:8px; padding:8px 12px; margin-top:8px; line-height:1.6; }
+.emoji-hero{ font-size:2.4rem; text-align:center; background:#f1e7d6; border-radius:12px;
   padding:10px 0; margin-bottom:8px; }
 
-.stats-row{ display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 12px; }
-.stat{ flex:1 1 140px; text-align:center; padding:14px 8px; }
-.stat .v{ font-size:1.3rem; font-weight:900; color:var(--rose); }
-.stat .l{ font-size:.78rem; color:#A0728B; margin-top:2px; }
+.stats-row{ display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 14px; }
+.stat{ flex:1 1 140px; text-align:center; padding:16px 8px; }
+.stat .v{ font-family:'Noto Serif TC',serif; font-size:1.4rem; font-weight:900; color:var(--terra); }
+.stat .l{ font-size:.78rem; color:var(--muted); margin-top:3px; }
 
-.stButton > button{ border-radius:14px; border:1.5px solid #E9C2CF;
-  color:var(--plum); background:rgba(255,255,255,.7);
-  backdrop-filter:blur(6px); font-weight:800; min-height:2.9rem;
-  transition:transform .12s ease, box-shadow .18s ease, background .2s; }
-.stButton > button:hover{ border-color:var(--rose); color:var(--rose);
-  box-shadow:0 8px 18px rgba(180,90,120,.18); }
+.stButton > button{ border-radius:999px; border:1px solid var(--line);
+  color:#7a5a3f; background:var(--card); font-weight:700; min-height:2.7rem;
+  transition:transform .12s ease, box-shadow .18s ease, background .2s, border-color .2s; }
+.stButton > button:hover{ border-color:var(--terra); color:var(--terra);
+  box-shadow:0 6px 16px rgba(120,90,50,.12); }
 .stButton > button:active{ transform:scale(.97); }
 div[data-testid="stButton"] > button[kind="primary"]{
-  background:linear-gradient(120deg,var(--pink-1),var(--pink-2)); color:#fff; border:none;
-  font-size:1.02rem; font-weight:900; box-shadow:0 10px 22px rgba(180,90,120,.34); }
+  background:var(--terra); color:#fff; border:none;
+  font-size:1rem; font-weight:700; box-shadow:0 4px 14px rgba(192,73,43,.28); }
+div[data-testid="stButton"] > button[kind="primary"]:hover{ background:#a93d22; color:#fff; }
 div[data-testid="stButton"] > button[kind="primary"]:active{ transform:scale(.97); }
-.stLinkButton > a{ border-radius:14px!important; min-height:2.9rem; font-weight:800!important; }
+.stLinkButton > a{ border-radius:999px!important; min-height:2.7rem; font-weight:700!important;
+  background:var(--card)!important; border:1px solid var(--line)!important; color:#7a5a3f!important; }
+.stButton > button p, .stLinkButton > a p{ white-space:nowrap; }
+.stDownloadButton > button{ border-radius:999px; }
 
-.stTabs [data-baseweb="tab-list"]{ gap:8px; overflow-x:auto; flex-wrap:nowrap;
-  scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:4px 0 10px; }
+.stTabs [data-baseweb="tab-list"]{ gap:6px; overflow-x:auto; flex-wrap:nowrap;
+  scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:4px 0 14px;
+  border-bottom:1px solid var(--line2); }
 .stTabs [data-baseweb="tab-list"]::-webkit-scrollbar{ display:none; }
-.stTabs [data-baseweb="tab"]{ background:rgba(255,255,255,.7); backdrop-filter:blur(6px);
-  border-radius:999px; padding:8px 16px; border:1px solid var(--line);
-  color:var(--plum); font-weight:800; white-space:nowrap; flex-shrink:0; }
-.stTabs [aria-selected="true"]{ background:linear-gradient(120deg,var(--pink-1),var(--pink-2))!important;
-  color:#fff!important; border:none!important; box-shadow:0 6px 16px rgba(180,90,120,.3); }
+.stTabs [data-baseweb="tab"]{ background:transparent;
+  border-radius:13px; padding:9px 16px; border:none;
+  color:#6f5f4c; font-weight:700; white-space:nowrap; flex-shrink:0; }
+.stTabs [data-baseweb="tab"]:hover{ background:#f1e7d6; }
+.stTabs [aria-selected="true"]{ background:var(--ink)!important;
+  color:#fff!important; border:none!important; }
+.stTabs [data-baseweb="tab-highlight"], .stTabs [data-baseweb="tab-border"]{ background:transparent!important; }
 
-[data-testid="stDataFrame"]{ border-radius:16px; overflow:hidden; box-shadow:var(--shadow); }
+[data-testid="stDataFrame"]{ border-radius:16px; overflow:hidden; box-shadow:var(--shadow);
+  border:1px solid var(--line); }
 
 /* ---------- 響應式（手機優先） ---------- */
 @media (max-width:1024px){
@@ -210,35 +235,35 @@ div[data-testid="stButton"] > button[kind="primary"]:active{ transform:scale(.97
 }
 @media (max-width:768px){
   .block-container{ padding:.8rem .7rem 3rem!important; }
-  .hero h1{ font-size:1.45rem; } .hero p{ font-size:.82rem; }
+  .hero h1{ font-size:1.6rem; } .hero p{ font-size:.85rem; }
+  .appbar .brand .t{ font-size:19px; }
   .yt-thumb{ height:150px; }
 }
 @media (max-width:560px){
   [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{
     flex:1 1 100%!important; min-width:100%!important; }
-  .hero{ padding:18px 18px; border-radius:20px; }
-  .hero h1{ font-size:1.3rem; }
-  .section-title{ font-size:1.06rem; }
+  .hero .inner{ padding:24px 22px; }
+  .hero h1{ font-size:1.4rem; }
+  .section-title{ font-size:1.25rem; }
   .stButton > button{ min-height:3rem; font-size:1rem; }
-  .stat .v{ font-size:1.15rem; }
+  .stat .v{ font-size:1.2rem; }
   .yt-thumb{ height:185px; }
 }
 @media (max-width:380px){
-  .hero h1{ font-size:1.15rem; } .hero p{ font-size:.76rem; }
+  .hero h1{ font-size:1.25rem; } .hero p{ font-size:.8rem; }
   .block-container{ padding:.6rem .5rem 3rem!important; }
 }
 footer{ visibility:hidden; }
 
-.yt-wrap{ position:relative; border-radius:14px; overflow:hidden; height:140px;
-  box-shadow:0 6px 16px rgba(180,90,120,.16); }
-.yt-wrap .yt-thumb{ height:100%; box-shadow:none; border-radius:0; }
+.yt-wrap{ position:relative; border-radius:12px; overflow:hidden; height:140px; background:#f1e7d6; }
+.yt-wrap .yt-thumb{ height:100%; border-radius:0; }
 .yt-play{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-size:32px; color:#fff; background:rgba(156,77,104,.16); opacity:0; transition:opacity .2s; }
-.yt-wrap:hover .yt-play{ opacity:1; background:rgba(156,77,104,.34); }
-.yt-card-title{ font-weight:800; color:var(--plum); font-size:.9rem; line-height:1.35;
-  margin-top:8px; height:2.45em; display:-webkit-box; -webkit-line-clamp:2;
+  font-size:30px; color:#fff; background:rgba(43,33,26,.14); opacity:0; transition:opacity .2s; }
+.yt-wrap:hover .yt-play{ opacity:1; background:rgba(43,33,26,.34); }
+.yt-card-title{ font-family:'Noto Serif TC',serif; font-weight:700; color:var(--ink); font-size:.95rem; line-height:1.3;
+  margin-top:9px; height:2.5em; display:-webkit-box; -webkit-line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden; }
-.yt-card-chan{ font-size:.74rem; color:#A0728B; margin:5px 0 2px; white-space:nowrap;
+.yt-card-chan{ font-size:.74rem; color:var(--muted3); margin:5px 0 2px; white-space:nowrap;
   overflow:hidden; text-overflow:ellipsis; }
 @media (max-width:560px){ .yt-wrap{ height:190px; } }
 
@@ -247,67 +272,34 @@ footer{ visibility:hidden; }
 .day-card .yt-thumb{ height:84px; }
 
 .rec-emoji{ font-size:30px; text-align:center; }
-.rec-name{ font-weight:800; color:var(--plum); font-size:.86rem; text-align:center;
-  line-height:1.3; height:2.4em; display:-webkit-box; -webkit-line-clamp:2;
+.rec-name{ font-family:'Noto Serif TC',serif; font-weight:700; color:var(--ink); font-size:1rem; text-align:center;
+  line-height:1.25; height:2.5em; display:-webkit-box; -webkit-line-clamp:2;
   -webkit-box-orient:vertical; overflow:hidden; margin:4px 0 6px; }
 .rec-name + .cost-badge{ display:block; text-align:center; }
 
 .cost-badge{ white-space:nowrap; }
-.day-card .cost-badge{ font-size:.76rem; padding:3px 8px; }
+.day-card .cost-badge{ font-size:.78rem; }
 .day-card .dish-mini{ height:2.4em; }
 
-.rec-cat{ font-weight:800; color:#8E4560; margin:12px 2px 4px; font-size:.98rem; }
-.pan-have{ font-size:.86rem; color:#7A3B55; background:#FFE6F0; border-radius:10px; padding:6px 10px; margin:2px 0 6px; }
-.pan-cat{ font-weight:700; color:#9A5570; font-size:.84rem; margin:8px 2px 2px; }
-.pan-ok{ display:inline-block; font-size:.82rem; font-weight:700; color:#1B7A4B; margin:2px 0; }
-.pan-miss{ font-size:.8rem; color:#A14B63; margin:2px 0 4px; }
-.pan-miss-ok{ color:#1B7A4B; font-weight:700; }
-.pan-guide{ font-size:.85rem; line-height:1.7; color:#7A3B55; background:#FFF0F6; border:1px dashed #F4A6C6; border-radius:12px; padding:9px 13px; margin:4px 0 10px; }</style>
+.rec-cat{ font-family:'Noto Serif TC',serif; font-weight:700; color:var(--ink); margin:14px 2px 6px; font-size:1.15rem; }
+.pan-have{ font-size:.86rem; color:#5f5141; background:var(--panel); border-radius:10px;
+  padding:8px 12px; margin:2px 0 6px; border:1px solid var(--line); }
+.pan-cat{ font-weight:700; color:#7a5a3f; font-size:.84rem; margin:8px 2px 2px; }
+.pan-ok{ display:inline-block; font-size:.82rem; font-weight:700; color:var(--green); margin:2px 0; }
+.pan-miss{ font-size:.8rem; color:var(--terra); margin:2px 0 4px; }
+.pan-miss-ok{ color:var(--green); font-weight:700; }
+.pan-guide{ font-size:.85rem; line-height:1.7; color:#5f5141; background:var(--panel);
+  border:1px dashed var(--muted2); border-radius:12px; padding:10px 14px; margin:4px 0 10px; }
+
+/* 人數 − / + 步進器 */
+.stepper-label{ font-weight:700; color:var(--ink); font-size:.92rem; margin-bottom:4px; }
+.people-count{ text-align:center; font-family:'Noto Serif TC',serif; font-weight:900;
+  font-size:1.35rem; color:var(--ink); line-height:2.7rem; }</style>
 """, unsafe_allow_html=True)
 
 
-# ---------------------------------------------------------------- 影片背景（cooking background）
-# 影片放在 ./static/，由 Streamlit 靜態服務 app/static/ 提供；瀏覽器只下載一次並快取，
-# 不會隨每次 rerun 重傳。上方覆一層粉色半透明遮罩，確保原本粉色主題與文字仍清晰可讀。
+# 烹飪背景影片（由 Streamlit 靜態服務 app/static/ 提供）；現只用於 Hero 區塊內當動態背景。
 _BG_VIDEO_URL = "app/static/cooking_background.mp4"
-st.markdown("""
-<style>
-.stApp{ background:transparent !important; }
-#bg-video, #bg-video-tint{
-  position:fixed; inset:0; width:100vw; height:100vh; margin:0; padding:0;
-  border:0; pointer-events:none;
-}
-#bg-video{ object-fit:cover; z-index:-3; }
-#bg-video-tint{ z-index:-2;
-  background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(253,231,238,.42) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(253,244,246,.55) 0%, rgba(251,239,242,.45) 45%, rgba(247,232,238,.60) 100%);
-}
-</style>
-""", unsafe_allow_html=True)
-
-components.html(f"""
-<script>
-(function(){{
-  const doc = window.parent.document;
-  if (doc.getElementById('bg-video')) return;
-  const tint = doc.createElement('div');
-  tint.id = 'bg-video-tint';
-  doc.body.insertBefore(tint, doc.body.firstChild);
-  const v = doc.createElement('video');
-  v.id = 'bg-video';
-  v.src = '{_BG_VIDEO_URL}';
-  v.autoplay = true; v.loop = true; v.muted = true; v.defaultMuted = true;
-  v.playsInline = true;
-  v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-  v.setAttribute('preload', 'auto');
-  doc.body.insertBefore(v, doc.body.firstChild);
-  const tryPlay = () => v.play().catch(() => {{}});
-  tryPlay();
-  doc.addEventListener('click', tryPlay, {{ once: true }});
-}})();
-</script>
-""", height=0, width=0)
 
 
 # ---------------------------------------------------------------- 估價（本機推估）
@@ -379,6 +371,22 @@ def people_factor(n):
 def scaled_cost(recipe, n):
     f = people_factor(n)
     return int(round(recipe["cost"][0] * f)), int(round(recipe["cost"][1] * f))
+
+
+def people_stepper(value, key_prefix, lo=2, hi=6, label="👨‍👩‍👧 用餐人數"):
+    """以 − / + 按鈕調整人數（取代滑桿），回傳調整後的人數。"""
+    st.markdown(f"<div class='stepper-label'>{label}</div>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    v = value
+    with c1:
+        if st.button("−", key=f"{key_prefix}_minus", use_container_width=True):
+            v = max(lo, value - 1)
+    with c3:
+        if st.button("＋", key=f"{key_prefix}_plus", use_container_width=True):
+            v = min(hi, value + 1)
+    with c2:
+        st.markdown(f"<div class='people-count'>{v} 人</div>", unsafe_allow_html=True)
+    return v
 
 
 @functools.lru_cache(maxsize=64)
@@ -510,80 +518,60 @@ def scaled_cost_badge(ingredients, people):
 
 
 
-# ---------------------------------------------------------------- 頁首
-HERO_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
- html,body{margin:0;height:100%;overflow:hidden;font-family:'Noto Sans TC',sans-serif;}
- #wrap{position:relative;width:100%;height:200px;border-radius:24px;overflow:hidden;
-   background:linear-gradient(120deg,#C2698A,#9C4D68 55%,#A8546F);}
- #c{position:absolute;inset:0;}
- #txt{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
-   padding:0 26px;color:#FFF8F9;z-index:2;}
- #txt h1{margin:0;font-size:30px;font-weight:900;letter-spacing:1px;opacity:0;}
- #txt p{margin:8px 0 0;font-size:14px;opacity:0;line-height:1.5;}
- .gold{color:#F4D9A6;font-weight:800;}
- .badge{display:inline-block;margin-top:10px;background:rgba(255,248,249,.18);
-   border:1px solid rgba(244,217,166,.55);color:#F4D9A6;font-size:12px;font-weight:700;
-   border-radius:999px;padding:4px 14px;opacity:0;width:fit-content;}
- @media(max-width:560px){#txt h1{font-size:23px}#txt p{font-size:12px}}
-</style></head><body>
-<div id="wrap"><canvas id="c"></canvas>
- <div id="txt">
-  <h1 id="t1">🌸 今天煮什麼？</h1>
-  <p id="t2">亞庇家庭買菜煮飯小幫手 · <span class="gold">麗都 &amp; 生源市場</span> · YouTube 找菜・一鍵排餐 💕</p>
-  <span class="badge" id="t3">✦ David Lau Cooking Market Project</span>
- </div>
+# ---------------------------------------------------------------- 頁首：品牌列 + Hero
+# 品牌列（沿用設計稿的 logo「煮」＋中英標題）
+st.markdown("""
+<div class="appbar">
+  <div class="logo">煮</div>
+  <div class="brand">
+    <div class="t">今天煮什麼？</div>
+    <div class="s">What to cook today · 亞庇 Kota Kinabalu</div>
+  </div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script>
-(function(){
- var wrap=document.getElementById('wrap');
- var W=wrap.clientWidth,H=wrap.clientHeight;
- var renderer=new THREE.WebGLRenderer({canvas:document.getElementById('c'),alpha:true,antialias:true});
- renderer.setSize(W,H);renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
- var scene=new THREE.Scene();
- var camera=new THREE.PerspectiveCamera(60,W/H,0.1,100);camera.position.z=18;
- var cv=document.createElement('canvas');cv.width=cv.height=64;var ctx=cv.getContext('2d');
- var g=ctx.createRadialGradient(32,32,0,32,32,32);
- g.addColorStop(0,'rgba(255,255,255,0.95)');g.addColorStop(0.4,'rgba(255,225,235,0.7)');
- g.addColorStop(1,'rgba(255,200,220,0)');ctx.fillStyle=g;ctx.fillRect(0,0,64,64);
- var tex=new THREE.CanvasTexture(cv);
- var N=70,pos=new Float32Array(N*3),spd=[];
- for(var i=0;i<N;i++){pos[i*3]=(Math.random()-0.5)*44;pos[i*3+1]=(Math.random()-0.5)*26;pos[i*3+2]=(Math.random()-0.5)*10;
-  spd.push({x:(Math.random()-0.5)*0.01,y:0.01+Math.random()*0.02});}
- var geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
- var mat=new THREE.PointsMaterial({size:1.7,map:tex,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,opacity:0.85});
- var pts=new THREE.Points(geo,mat);scene.add(pts);
- function animate(){requestAnimationFrame(animate);
-  var a=geo.attributes.position.array;
-  for(var i=0;i<N;i++){a[i*3]+=spd[i].x;a[i*3+1]+=spd[i].y;if(a[i*3+1]>14){a[i*3+1]=-14;a[i*3]=(Math.random()-0.5)*44;}}
-  geo.attributes.position.needsUpdate=true;pts.rotation.z+=0.0004;renderer.render(scene,camera);}
- animate();
- window.addEventListener('resize',function(){W=wrap.clientWidth;H=wrap.clientHeight;renderer.setSize(W,H);camera.aspect=W/H;camera.updateProjectionMatrix();});
- if(window.gsap){gsap.to('#t1',{opacity:1,y:0,duration:0.8,ease:'power3.out',startAt:{y:18}});
-  gsap.to('#t2',{opacity:1,duration:0.8,delay:0.25});gsap.to('#t3',{opacity:1,duration:0.8,delay:0.5});}
- else{document.getElementById('t1').style.opacity=1;document.getElementById('t2').style.opacity=1;document.getElementById('t3').style.opacity=1;}
-})();
-</script></body></html>"""
-components.html(HERO_HTML, height=215)
+""", unsafe_allow_html=True)
+
+# Hero 動態背景：把烹飪影片放在 Hero 區塊內當「較小尺寸」的動態背景（取代滿版背景）。
+# weekend_feast.jpg 當 poster（載入前先顯示一張靜態圖，避免空白）。
+_hero_img = os.path.join(IMG_DIR, "weekend_feast.jpg")
+_hero_poster = (f"data:image/jpeg;base64,{_img_b64(_hero_img)}"
+                if os.path.exists(_hero_img) else "")
 
 _vt, _vd = _bump_visits(supabase)
 if _vt:
     _td = f" · 今日 {_vd}" if _vd is not None else ""
-    st.markdown(
-        f"<div style='text-align:right;color:#B86B86;font-size:.82rem;"
-        f"margin:-6px 6px 2px 0;'>👀 累計造訪 {_vt:,} 次{_td}</div>",
-        unsafe_allow_html=True)
+    _visits_html = f"👀 累計造訪 {_vt:,} 次{_td}"
+else:
+    _visits_html = "👀 為亞庇家庭設計的買菜煮飯小幫手"
+
+st.markdown(f"""
+<div class="hero">
+  <video autoplay loop muted playsinline preload="auto"
+         poster="{_hero_poster}" src="{_BG_VIDEO_URL}"></video>
+  <div class="scrim"></div>
+  <div class="inner">
+    <div class="tag">反向流程 · 選菜就好</div>
+    <h1>先選想吃的菜，<br>採買清單自動生成</h1>
+    <p>選菜 → YouTube 抽食材 → 一週餐表與花費。專為亞庇家庭晚餐而設，
+       對比 <span class="gold">麗都 &amp; 生源市場</span> 行情、貼心避開敏感食材。</p>
+    <div class="steps">
+      <div class="step"><span class="n">1</span>選菜</div>
+      <div class="step"><span class="n">2</span>抽食材</div>
+      <div class="step"><span class="n">3</span>採買 + 花費</div>
+    </div>
+    <div style="margin-top:18px;font-size:12px;color:rgba(255,255,255,.62);">{_visits_html}</div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+st.write("")
 
 if not CLIENTS_OK:
     st.error("⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
              "市場行情與樂齡專區仍可使用，但「找菜／餐表／採買清單」需要設定 Secrets。")
 
-tab_market, tab_find, tab_week, tab_shop, tab_budget, tab_elderly, tab_tips = st.tabs(
-    ["📊 市場行情", "🔍 找菜", "📅 一週餐表", "🛒 採買清單",
-     "💰 花費總覽", "👵 樂齡專區", "💡 小貼士"])
+# 導覽：依新設計稿順序——找菜(探索) 為首頁，再餐表 / 採買 / 花費 / 行情 / 樂齡 / 貼士
+tab_find, tab_week, tab_shop, tab_budget, tab_market, tab_elderly, tab_tips = st.tabs(
+    ["🍳 探索找菜", "📅 一週餐表", "🛒 採買清單",
+     "💰 花費總覽", "📊 市場行情", "👵 樂齡專區", "💡 小貼士"])
 
 
 # ================ 📊 市場行情 ================
@@ -644,7 +632,7 @@ with tab_market:
                         "價格 (RM/kg)": f"RM {a} – {b}", "特點 / 料理方式": note}
                        for zh, my, e, a, b, note in SEAFOOD_PRICES])
     st.dataframe(sf, use_container_width=True, hide_index=True)
-    st.markdown("<div class='card'><b style='color:#8E4560'>🧺 買海鮮小貼士</b><br>" +
+    st.markdown("<div class='card'><b style='color:#2b211a'>🧺 買海鮮小貼士</b><br>" +
                 "<br>".join(MARKET_TIPS[:5]) + "</div>", unsafe_allow_html=True)
 
 
@@ -665,10 +653,10 @@ with tab_find:
         ss.setdefault("cuisine", "全部")
 
         with st.container(border=True):
-            st.markdown("<b style='color:#8E4560'>⚙️ 用餐設定</b>", unsafe_allow_html=True)
+            st.markdown("<b style='color:#2b211a'>⚙️ 用餐設定</b>", unsafe_allow_html=True)
             sc1, sc2 = st.columns([1.4, 1])
             with sc1:
-                ss.people = st.slider("👨‍👩‍👧 用餐人數", 2, 6, ss.people, key="people_slider")
+                ss.people = people_stepper(ss.people, "people")
             with sc2:
                 ss.skin = st.toggle("💧 皮膚敏感（標示發物）", value=ss.skin, key="skin_toggle")
             try:
@@ -779,7 +767,13 @@ with tab_find:
                             f"<div class='rec-name'>{_name}{_fl}</div>"
                             f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
                             unsafe_allow_html=True)
-                        with st.popover("➕ 排入", use_container_width=True):
+                        # 看做法：到 YouTube 搜尋這道菜的做法（新分頁開啟，像設計稿一樣）
+                        _wq = (CUISINE_KW.get(cz, "") + " " + _name + " 做法 食譜").strip()
+                        _yt = ("https://www.youtube.com/results?search_query="
+                               + urllib.parse.quote(_wq))
+                        st.link_button("▶ 看做法", _yt, use_container_width=True)
+                        _pop = st.popover("➕ 排入", use_container_width=True)
+                        with _pop:
                             _d = st.date_input("排到哪一天", value=date.today(), key=f"rd_{cz}_{_i}")
                             _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"rs_{cz}_{_i}")
                             if st.button("✅ 確認排入", key=f"rcf_{cz}_{_i}", use_container_width=True):
@@ -996,7 +990,7 @@ with tab_week:
                 st.rerun()
 
         with st.container(border=True):
-            st.markdown("<b style='color:#8E4560'>🪄 一鍵生成：依你選的料理大類搜 YouTube 填滿餐表</b>",
+            st.markdown("<b style='color:#2b211a'>🪄 一鍵生成：依你選的料理大類搜 YouTube 填滿餐表</b>",
                         unsafe_allow_html=True)
             gcz1, gcz2 = st.columns([1.6, 1])
             with gcz1:
@@ -1146,7 +1140,7 @@ with tab_week:
                 ss.week_anchor += timedelta(days=7)
         mon = MP.week_start(ss.week_anchor)
         with nav2:
-            st.markdown(f"<div style='text-align:center;font-weight:900;color:#8E4560'>"
+            st.markdown(f"<div style='text-align:center;font-weight:900;color:#2b211a'>"
                         f"{mon} ～ {mon + timedelta(days=6)}</div>", unsafe_allow_html=True)
 
         week_names = ["一", "二", "三", "四", "五", "六", "日"]
@@ -1171,7 +1165,7 @@ with tab_week:
                                 unsafe_allow_html=True)
                     dishes = grid.get((str(day), slot), [])
                     if not dishes:
-                        st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
+                        st.markdown("<div class='dish-mini' style='color:#b39a6e'>· 未排</div>",
                                     unsafe_allow_html=True)
                     for dish in dishes:
                         render_dish(dish, day, slot)
@@ -1188,7 +1182,7 @@ with tab_week:
                                         unsafe_allow_html=True)
                             dishes = grid.get((str(day), slot), [])
                             if not dishes:
-                                st.markdown("<div class='dish-mini' style='color:#C99AAD'>· 未排</div>",
+                                st.markdown("<div class='dish-mini' style='color:#b39a6e'>· 未排</div>",
                                             unsafe_allow_html=True)
                             for dish in dishes:
                                 render_dish(dish, day, slot)
@@ -1239,10 +1233,24 @@ with tab_shop:
                                for r in recipes if estimate_dish_cost(r.get("ingredients")))
                 total_hi = sum(estimate_dish_cost(r.get("ingredients"))[1]
                                for r in recipes if estimate_dish_cost(r.get("ingredients")))
-                st.markdown(f"<div class='card'>🧮 本週估計買菜費："
-                            f"<b style='color:#B4456A'>估 RM {total_lo} – {total_hi}</b>"
-                            f"（{len(recipes)} 餐，依市場行情粗估，未含米油鹽等常備品）</div>",
-                            unsafe_allow_html=True)
+                _mid = (total_lo + total_hi) / 2
+                _per = _mid / len(recipes) if recipes else 0
+                st.markdown(
+                    f"<div style='background:#2b211a;color:#fff;border-radius:20px;"
+                    f"padding:22px 26px;margin-bottom:18px;display:flex;flex-wrap:wrap;"
+                    f"align-items:center;gap:8px 36px;'>"
+                    f"<div><div style='font-size:12px;letter-spacing:2px;text-transform:uppercase;"
+                    f"color:rgba(255,255,255,.55);'>預估總花費 ESTIMATED TOTAL</div>"
+                    f"<div class='serif' style='font-weight:900;font-size:2.4rem;margin-top:4px;'>"
+                    f"RM {total_lo} – {total_hi}</div></div>"
+                    f"<div style='margin-left:auto;text-align:right;font-size:13px;"
+                    f"color:rgba(255,255,255,.78);line-height:1.9;'>"
+                    f"🍽️ 本週 {len(recipes)} 餐<br>"
+                    f"每餐平均約 <b style='color:#e7b04a'>RM {_per:.0f}</b></div>"
+                    f"<div style='flex-basis:100%;font-size:12px;color:rgba(255,255,255,.5);'>"
+                    f"依市場行情粗估，未含米油鹽等常備品</div>"
+                    f"</div>",
+                    unsafe_allow_html=True)
                 cat_emojis = {"蔬菜": "🥬", "肉類": "🍗", "海鮮": "🐟", "蛋豆製品": "🥚",
                               "調味料": "🧄", "乾貨雜貨": "🛍️", "其他": "🧺"}
                 cols = st.columns(3)
@@ -1251,12 +1259,12 @@ with tab_shop:
                 for cat, items in shopping.items():
                     with cols[idx % 3]:
                         items_html = "".join(
-                            f"<div style='padding:4px 0;border-bottom:1px dashed #F0D5DD;"
+                            f"<div style='padding:4px 0;border-bottom:1px dashed #f4ecdd;"
                             f"display:flex;justify-content:space-between'>"
                             f"<span>☐ {it['name']}</span>"
-                            f"<b style='color:#B4456A'>{it['amount']}</b></div>"
+                            f"<b style='color:#c0492b'>{it['amount']}</b></div>"
                             for it in items)
-                        st.markdown(f"<div class='card'><b style='color:#8E4560'>"
+                        st.markdown(f"<div class='card'><b style='color:#2b211a'>"
                                     f"{cat_emojis.get(cat, '🛍️')} {cat}</b><br>{items_html}</div>",
                                     unsafe_allow_html=True)
                     lines.append(f"【{cat}】")
@@ -1314,11 +1322,11 @@ with tab_budget:
                              use_container_width=True, hide_index=True)
             with b2:
                 chart_df = df.set_index("星期")[["當日估費"]].rename(columns={"當日估費": "RM"})
-                st.bar_chart(chart_df, color="#C2698A")
+                st.bar_chart(chart_df, color="#c0492b")
                 wk = int(df["當日估費"].sum())
                 avg = df["當日估費"].mean()
-                st.markdown(f"<div class='card'>📌 本週估計合計約 <b style='color:#B4456A'>RM {wk}</b>，"
-                            f"平均每天約 <b style='color:#B4456A'>RM {avg:.0f}</b>"
+                st.markdown(f"<div class='card'>📌 本週估計合計約 <b style='color:#c0492b'>RM {wk}</b>，"
+                            f"平均每天約 <b style='color:#c0492b'>RM {avg:.0f}</b>"
                             f"（粗估，未含米油鹽等常備品）</div>", unsafe_allow_html=True)
 
 
@@ -1326,7 +1334,11 @@ with tab_budget:
 with tab_elderly:
     st.markdown("<div class='section-title'>👵 適合家有年長者的食譜</div>",
                 unsafe_allow_html=True)
-    n_eld = st.slider("👨‍👩‍👧 用餐人數", 2, 6, 4, key="elder_people")
+    st.session_state.setdefault("people_eld", 4)
+    _es1, _es2 = st.columns([1, 1.6])
+    with _es1:
+        st.session_state.people_eld = people_stepper(st.session_state.people_eld, "elder")
+    n_eld = st.session_state.people_eld
     elder_recipes = [r for r in RECIPES if r.get("elderly_ok")]
     cols = st.columns(3)
     for idx, r in enumerate(elder_recipes):
@@ -1337,7 +1349,7 @@ with tab_elderly:
                         f"<span class='cost-badge'>💰 RM {lo2} – {hi2}</span>"
                         f"<div class='note'>👵 {r.get('elderly_note', '')}</div></div>",
                         unsafe_allow_html=True)
-    st.markdown("<div class='card'><b style='color:#8E4560'>🤍 為長輩備餐的小提醒</b><br>" +
+    st.markdown("<div class='card'><b style='color:#2b211a'>🤍 為長輩備餐的小提醒</b><br>" +
                 "<br>".join(ELDERLY_TIPS) + "</div>", unsafe_allow_html=True)
 
 
@@ -1345,22 +1357,22 @@ with tab_elderly:
 with tab_tips:
     t1, t2 = st.columns(2)
     with t1:
-        st.markdown("<div class='card'><b style='color:#8E4560'>🧺 市場採買小貼士</b><br>" +
+        st.markdown("<div class='card'><b style='color:#2b211a'>🧺 市場採買小貼士</b><br>" +
                     "<br>".join(MARKET_TIPS) + "</div>", unsafe_allow_html=True)
     with t2:
-        st.markdown("""<div class='card'><b style='color:#8E4560'>🌸 使用小撇步</b><br>
+        st.markdown("""<div class='card'><b style='color:#2b211a'>🌸 使用小撇步</b><br>
         ① 「📊 市場行情」先看這個月什麼變便宜<br>
         ② 「🔍 找菜」輸入想煮的菜 → 卡片結果可直接播放、排進餐表<br>
         ③ 「📅 一週餐表」可手動排，或按 🪄 一鍵生成填滿一週<br>
         ④ 「🛒 採買清單」自動加總食材＋估價，可下載或 WhatsApp 分享<br>
         ⑤ 「💰 花費總覽」看本週每天大概要花多少
         </div>""", unsafe_allow_html=True)
-        st.markdown("""<div class='card'><b style='color:#8E4560'>📍 之後可以擴充</b><br>
+        st.markdown("""<div class='card'><b style='color:#2b211a'>📍 之後可以擴充</b><br>
         ・更精準的估價（接 LLM 依亞庇市價估每道菜）<br>
         ・收藏「我家最愛」常用菜單<br>
         ・節慶菜單（農曆新年、中秋圍爐）
         </div>""", unsafe_allow_html=True)
 
-st.markdown("<p style='text-align:center;color:#C99AAD;font-size:0.8rem;margin-top:18px'>"
+st.markdown("<p style='text-align:center;color:#b39a6e;font-size:0.8rem;margin-top:18px'>"
             "🌸 今天煮什麼？ · 為亞庇的妳設計 · 估價為市場常見推算，實際以當日市價為準</p>",
             unsafe_allow_html=True)
