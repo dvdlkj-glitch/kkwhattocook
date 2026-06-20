@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #ece3d4; font-family: "Noto Sans TC", system-ui, sans-serif; color: #2b211a; -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { height: 8px; width: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d8cab2; border-radius: 8px; }
+  @keyframes viewIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { from { transform: scale(.94); } to { transform: scale(1); } }
+</style>
+</helmet>
+<div style="min-height:100vh;background:#f6efe4;background-image:radial-gradient(circle at 12% -5%, #f4e7d2 0%, transparent 40%),radial-gradient(circle at 90% 0%, #f0e3cf 0%, transparent 35%);">
+
+  <!-- APP BAR -->
+  <header style="position:sticky;top:0;z-index:50;background:rgba(246,239,228,.86);backdrop-filter:blur(12px);border-bottom:1px solid #e7dccb;">
+    <div style="max-width:1180px;margin:0 auto;padding:14px 22px;display:flex;align-items:center;gap:18px;">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-right:auto;">
+        <div style="width:34px;height:34px;border-radius:10px;background:#c0492b;color:#fff;display:grid;place-items:center;font-family:'Noto Serif TC',serif;font-weight:900;font-size:19px;align-self:center;">煮</div>
+        <div style="line-height:1;">
+          <div style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:21px;letter-spacing:.5px;">今天煮什麼?</div>
+          <div style="font-size:11px;color:#9b8b76;letter-spacing:2px;margin-top:3px;text-transform:uppercase;">What to cook today · 亞庇 Kota Kinabalu</div>
+        </div>
+      </div>
+
+      <div style="display:flex;align-items:center;gap:6px;background:#fffdf8;border:1px solid #e7dccb;border-radius:999px;padding:5px 6px;">
+        <button onClick="{{ decPeople }}" style="width:28px;height:28px;border:none;border-radius:50%;background:#f1e7d6;color:#7a5a3f;font-size:17px;cursor:pointer;line-height:1;">−</button>
+        <div style="min-width:54px;text-align:center;font-size:13px;font-weight:700;">{{ people }} {{ ui.people }}</div>
+        <button onClick="{{ incPeople }}" style="width:28px;height:28px;border:none;border-radius:50%;background:#c0492b;color:#fff;font-size:17px;cursor:pointer;line-height:1;">+</button>
+      </div>
+
+      <div style="display:flex;background:#f1e7d6;border-radius:999px;padding:3px;">
+        <button onClick="{{ setZh }}" style="{{ zhBtnStyle }}">中</button>
+        <button onClick="{{ setEn }}" style="{{ enBtnStyle }}">EN</button>
+      </div>
+    </div>
+
+    <!-- NAV -->
+    <nav style="max-width:1180px;margin:0 auto;padding:0 14px 10px;display:flex;gap:6px;overflow-x:auto;">
+      <sc-for list="{{ navItems }}" as="n" hint-placeholder-count="6">
+        <button onClick="{{ n.onClick }}" style="{{ n.style }}">
+          <span style="font-size:14px;">{{ n.label }}</span>
+          <span style="font-size:10px;opacity:.6;letter-spacing:1px;text-transform:uppercase;">{{ n.sub }}</span>
+        </button>
+      </sc-for>
+    </nav>
+  </header>
+
+  <main style="max-width:1180px;margin:0 auto;padding:26px 22px 80px;">
+
+    <!-- ============ DISCOVER ============ -->
+    <sc-if value="{{ isDiscover }}" hint-placeholder-val="{{ true }}">
+    <section key="discover" style="animation:viewIn .4s ease;">
+
+      <!-- HERO -->
+      <div style="position:relative;border-radius:22px;overflow:hidden;border:1px solid #e7dccb;margin-bottom:26px;">
+        <img src="img/weekend_feast.jpg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+        <div style="position:absolute;inset:0;background:linear-gradient(100deg,rgba(43,33,26,.86) 0%,rgba(43,33,26,.55) 45%,rgba(43,33,26,.15) 100%);"></div>
+        <div style="position:relative;padding:38px 34px;max-width:560px;">
+          <div style="display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;padding:5px 12px;border-radius:999px;margin-bottom:16px;">{{ ui.heroTag }}</div>
+          <h1 style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:38px;line-height:1.18;color:#fff;margin:0 0 12px;text-wrap:balance;">{{ ui.heroTitle }}</h1>
+          <p style="color:rgba(255,255,255,.82);font-size:15px;line-height:1.65;margin:0 0 22px;max-width:430px;">{{ ui.heroBody }}</p>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;">
+            <sc-for list="{{ heroSteps }}" as="s" hint-placeholder-count="3">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="width:30px;height:30px;border-radius:50%;background:#fff;color:#c0492b;display:grid;place-items:center;font-weight:900;font-size:14px;font-family:'Noto Serif TC',serif;">{{ s.n }}</div>
+                <div style="color:#fff;font-size:13px;font-weight:500;line-height:1.25;">{{ s.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:22px;font-size:12px;color:rgba(255,255,255,.6);">{{ ui.visits }}</div>
+        </div>
+      </div>
+
+      <!-- RECOMMENDATIONS -->
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px;margin-bottom:14px;">
+        <div>
+          <h2 style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:23px;margin:0;">{{ ui.recoTitle }}</h2>
+          <p style="color:#9b8b76;font-size:13px;margin:5px 0 0;">{{ ui.recoSub }}</p>
+        </div>
+        <button onClick="{{ shuffle }}" style="flex:none;display:inline-flex;align-items:center;gap:7px;background:#fffdf8;border:1px solid #e0d3bd;color:#7a5a3f;font-size:13px;font-weight:700;padding:9px 16px;border-radius:999px;cursor:pointer;">↻ {{ ui.shuffle }}</button>
+      </div>
+
+      <!-- controls -->
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:18px;">
+        <sc-for list="{{ catChips }}" as="c" hint-placeholder-count="6">
+          <button onClick="{{ c.onClick }}" style="{{ c.style }}">{{ c.label }}</button>
+        </sc-for>
+        <label style="display:inline-flex;align-items:center;gap:8px;margin-left:6px;cursor:pointer;font-size:13px;color:#7a5a3f;background:#fffdf8;border:1px solid #e0d3bd;border-radius:999px;padding:7px 14px;">
+          <span onClick="{{ toggleSkin }}" style="{{ skinTrackStyle }}"><span style="{{ skinKnobStyle }}"></span></span>
+          <span onClick="{{ toggleSkin }}">{{ ui.skin }}</span>
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px;">
+        <sc-for list="{{ recoCards }}" as="d" hint-placeholder-count="5">
+          <article style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:18px;overflow:hidden;box-shadow:0 4px 18px rgba(120,90,50,.06);display:flex;flex-direction:column;">
+            <div style="position:relative;height:150px;background:#f1e7d6;">
+              <sc-if value="{{ d.img }}" hint-placeholder-val="{{ false }}"><img src="{{ d.img }}" alt="{{ d.name }}" style="width:100%;height:100%;object-fit:cover;"></sc-if>
+              <div style="position:absolute;top:10px;left:10px;background:rgba(43,33,26,.78);color:#fff;font-size:11px;font-weight:600;padding:4px 9px;border-radius:999px;">{{ d.catLabel }}</div>
+              <sc-if value="{{ d.skin }}" hint-placeholder-val="{{ false }}"><div style="position:absolute;top:10px;right:10px;background:#e7b04a;color:#3a2a14;font-size:10px;font-weight:700;padding:4px 8px;border-radius:999px;">{{ ui.skinTag }}</div></sc-if>
+            </div>
+            <div style="padding:14px 15px 16px;display:flex;flex-direction:column;flex:1;">
+              <div style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:17px;line-height:1.2;">{{ d.name }}</div>
+              <div style="font-size:12px;color:#a2917b;margin-top:3px;">{{ d.sub }}</div>
+              <div style="font-size:13px;font-weight:700;color:#c0492b;margin-top:auto;padding-top:12px;">{{ d.cost }}</div>
+              <div style="display:flex;gap:8px;margin-top:10px;">
+                <button onClick="{{ d.onWatch }}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;background:#fff;border:1px solid #e0d3bd;color:#7a5a3f;font-size:12px;font-weight:700;padding:8px 10px;border-radius:999px;cursor:pointer;"><span style="color:#c0492b;font-size:10px;">▶</span> {{ ui.watch }}</button>
+                <button onClick="{{ d.onAdd }}" style="flex:1;background:#2b211a;color:#fff;border:none;font-size:12px;font-weight:700;padding:8px 10px;border-radius:999px;cursor:pointer;">+ {{ ui.add }}</button>
+              </div>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+
+    </section>
+    </sc-if>
+
+    <!-- ============ PLAN ============ -->
+    <sc-if value="{{ isPlan }}" hint-placeholder-val="{{ false }}">
+    <section key="plan" style="animation:viewIn .4s ease;">
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:20px;">
+        <div>
+          <h2 style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:28px;margin:0;">{{ ui.planTitle }}</h2>
+          <p style="color:#9b8b76;font-size:13px;margin:6px 0 0;">{{ ui.planSub }}</p>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button onClick="{{ autoFill }}" style="display:inline-flex;align-items:center;gap:7px;background:#c0492b;color:#fff;border:none;font-size:13px;font-weight:700;padding:11px 18px;border-radius:999px;cursor:pointer;box-shadow:0 4px 14px rgba(192,73,43,.28);">✦ {{ ui.autoFill }}</button>
+          <button onClick="{{ clearWeek }}" style="background:#fffdf8;border:1px solid #e0d3bd;color:#7a5a3f;font-size:13px;font-weight:700;padding:11px 18px;border-radius:999px;cursor:pointer;">{{ ui.clear }}</button>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <sc-for list="{{ planDays }}" as="day" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:84px 1fr 1fr;gap:12px;align-items:stretch;">
+            <div style="display:flex;flex-direction:column;justify-content:center;padding-left:4px;">
+              <div style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:17px;">{{ day.zh }}</div>
+              <div style="font-size:11px;color:#a2917b;letter-spacing:1px;text-transform:uppercase;">{{ day.en }}</div>
+            </div>
+            <sc-for list="{{ day.slots }}" as="c" hint-placeholder-count="2">
+              <div style="{{ c.cellStyle }}">
+                <sc-if value="{{ c.has }}" hint-placeholder-val="{{ false }}">
+                  <div style="position:relative;height:100%;display:flex;align-items:center;gap:11px;padding:8px;">
+                    <img src="{{ c.img }}" alt="" style="width:58px;height:58px;border-radius:11px;object-fit:cover;flex:none;">
+                    <div style="min-width:0;flex:1;">
+                      <div style="font-size:10px;color:#b39a6e;font-weight:700;letter-spacing:1px;text-transform:uppercase;">{{ c.slotLabel }}</div>
+                      <div style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:15px;line-height:1.15;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ c.name }}</div>
+                      <div style="font-size:12px;color:#c0492b;font-weight:700;margin-top:3px;">{{ c.cost }}</div>
+                    </div>
+                    <button onClick="{{ c.onRemove }}" style="flex:none;width:24px;height:24px;border:none;border-radius:50%;background:#f1e7d6;color:#9b8b76;font-size:13px;cursor:pointer;align-self:flex-start;">✕</button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ c.empty }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ goDiscover }}" style="width:100%;height:100%;min-height:74px;border:1.5px dashed #d8cab2;border-radius:14px;background:transparent;color:#b39a6e;font-size:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;">
+                    <span style="font-size:18px;line-height:1;">+</span>{{ c.slotLabel }}
+                  </button>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+    </sc-if>
+
+    <!-- ============ SHOP ============ -->
+    <sc-if value="{{ isShop }}" hint-placeholder-val="{{ false }}">
+    <section key="shop" style="animation:viewIn .4s ease;">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:28px;margin:0;">{{ ui.shopTitle }}</h2>
+        <p style="color:#9b8b76;font-size:13px;margin:6px 0 0;">{{ ui.shopSub }}</p>
+      </div>
+
+      <sc-if value="{{ shopEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:18px;padding:48px 24px;text-align:center;color:#a2917b;">
+          <div style="font-size:15px;margin-bottom:14px;">{{ ui.emptyShop }}</div>
+          <button onClick="{{ goDiscover }}" style="background:#2b211a;color:#fff;border:none;font-size:13px;font-weight:700;padding:11px 20px;border-radius:999px;cursor:pointer;">{{ ui.goPick }}</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ shopHas }}" hint-placeholder-val="{{ false }}">
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:22px;align-items:start;">
+        <div style="display:flex;flex-direction:column;gap:18px;">
+          <sc-for list="{{ shopGroups }}" as="g" hint-placeholder-count="3">
+            <div style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:18px;overflow:hidden;">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #f0e7d8;background:#fbf5ea;">
+                <div style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:16px;">{{ g.label }}</div>
+                <div style="font-size:12px;color:#a2917b;">{{ g.n }} {{ ui.items }}</div>
+              </div>
+              <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:1px solid #f4ecdd;">
+                  <span style="width:18px;height:18px;border-radius:5px;border:1.5px solid #d8cab2;flex:none;"></span>
+                  <div style="flex:1;min-width:0;">
+                    <span style="font-weight:600;font-size:14px;">{{ it.name }}</span>
+                    <span style="font-size:12px;color:#b39a6e;margin-left:8px;">{{ it.sub }}</span>
+                  </div>
+                  <div style="font-size:13px;font-weight:700;color:#7a5a3f;">{{ it.qty }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-for>
+        </div>
+
+        <aside style="position:sticky;top:130px;background:#2b211a;color:#fff;border-radius:20px;padding:24px;">
+          <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,.55);">{{ ui.estTotal }}</div>
+          <div style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:42px;margin:6px 0 2px;">{{ costTotal }}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:20px;">{{ costNote }}</div>
+          <div style="display:flex;flex-direction:column;gap:13px;">
+            <sc-for list="{{ costRows }}" as="r" hint-placeholder-count="4">
+              <div>
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px;">
+                  <span style="color:rgba(255,255,255,.85);">{{ r.label }}</span>
+                  <span style="font-weight:700;">{{ r.value }}</span>
+                </div>
+                <div style="height:6px;border-radius:999px;background:rgba(255,255,255,.12);overflow:hidden;">
+                  <div style="{{ r.barStyle }}"></div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.14);display:flex;justify-content:space-between;font-size:13px;">
+            <span style="color:rgba(255,255,255,.7);">{{ ui.perMeal }}</span>
+            <span style="font-weight:700;">{{ costPerMeal }}</span>
+          </div>
+        </aside>
+      </div>
+      </sc-if>
+    </section>
+    </sc-if>
+
+    <!-- ============ MARKET ============ -->
+    <sc-if value="{{ isMarket }}" hint-placeholder-val="{{ false }}">
+    <section key="market" style="animation:viewIn .4s ease;">
+      <div style="margin-bottom:20px;">
+        <h2 style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:28px;margin:0;">{{ ui.marketTitle }}</h2>
+        <p style="color:#9b8b76;font-size:13px;margin:6px 0 0;">{{ ui.marketSub }}</p>
+      </div>
+
+      <div style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:18px;overflow:hidden;margin-bottom:26px;">
+        <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 0.9fr;padding:13px 20px;background:#fbf5ea;border-bottom:1px solid #f0e7d8;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#a2917b;font-weight:700;">
+          <div>{{ ui.item }}</div>
+          <div style="text-align:right;">亞庇 KK</div>
+          <div style="text-align:right;">吉隆坡 KL</div>
+          <div style="text-align:right;">台北 TPE</div>
+          <div style="text-align:right;">MoM</div>
+        </div>
+        <sc-for list="{{ marketRows }}" as="m" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr 0.9fr;padding:14px 20px;border-bottom:1px solid #f4ecdd;align-items:center;">
+            <div>
+              <span style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:15px;">{{ m.name }}</span>
+              <span style="font-size:12px;color:#b39a6e;margin-left:7px;">{{ m.sub }}</span>
+            </div>
+            <div style="text-align:right;font-weight:700;font-size:14px;color:#2b211a;">{{ m.kk }}</div>
+            <div style="text-align:right;font-size:14px;color:#7a6a55;">{{ m.kl }}</div>
+            <div style="text-align:right;font-size:14px;color:#7a6a55;">{{ m.tpe }}</div>
+            <div style="text-align:right;"><span style="{{ m.momStyle }}">{{ m.mom }}</span></div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:20px;margin:0;">{{ ui.seafoodTitle }}</h3>
+        <span style="font-size:12px;color:#a2917b;">{{ ui.seafoodSrc }}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;">
+        <sc-for list="{{ seafoodRows }}" as="s" hint-placeholder-count="4">
+          <article style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:16px;overflow:hidden;">
+            <img src="{{ s.img }}" alt="{{ s.name }}" style="width:100%;height:108px;object-fit:cover;">
+            <div style="padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-family:'Noto Serif TC',serif;font-weight:700;font-size:15px;">{{ s.name }}</div>
+                <div style="font-size:11px;color:#b39a6e;">{{ s.sub }}</div>
+              </div>
+              <div style="font-size:14px;font-weight:700;color:#c0492b;text-align:right;">{{ s.price }}<div style="font-size:10px;color:#b39a6e;font-weight:500;">/ kg</div></div>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+    </section>
+    </sc-if>
+
+    <!-- ============ SENIOR ============ -->
+    <sc-if value="{{ isSenior }}" hint-placeholder-val="{{ false }}">
+    <section key="senior" style="animation:viewIn .4s ease;max-width:760px;margin:0 auto;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:14px;letter-spacing:3px;text-transform:uppercase;color:#b39a6e;">{{ ui.seniorKicker }}</div>
+        <h2 style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:34px;margin:8px 0 0;">{{ ui.seniorTitle }}</h2>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:24px;">
+        <button onClick="{{ seniorPrev }}" style="width:48px;height:48px;border:none;border-radius:50%;background:#fffdf8;border:1px solid #e0d3bd;color:#7a5a3f;font-size:22px;cursor:pointer;">‹</button>
+        <div style="text-align:center;min-width:160px;">
+          <div style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:26px;">{{ seniorDayZh }}</div>
+          <div style="font-size:14px;color:#a2917b;letter-spacing:1px;">{{ seniorDayEn }}</div>
+        </div>
+        <button onClick="{{ seniorNext }}" style="width:48px;height:48px;border:none;border-radius:50%;background:#fffdf8;border:1px solid #e0d3bd;color:#7a5a3f;font-size:22px;cursor:pointer;">›</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:18px;">
+        <sc-for list="{{ seniorSlots }}" as="c" hint-placeholder-count="2">
+          <div style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:22px;overflow:hidden;">
+            <sc-if value="{{ c.has }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:center;gap:20px;">
+                <img src="{{ c.img }}" alt="" style="width:160px;height:140px;object-fit:cover;flex:none;">
+                <div style="padding:18px 8px;">
+                  <div style="font-size:16px;color:#c0492b;font-weight:700;letter-spacing:2px;">{{ c.slotLabel }}</div>
+                  <div style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:30px;line-height:1.1;margin-top:6px;">{{ c.name }}</div>
+                  <div style="font-size:16px;color:#a2917b;margin-top:6px;">{{ c.sub }}</div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ c.empty }}" hint-placeholder-val="{{ false }}">
+              <div style="padding:30px;display:flex;align-items:center;gap:16px;color:#b39a6e;">
+                <div style="font-size:16px;color:#c0492b;font-weight:700;letter-spacing:2px;min-width:70px;">{{ c.slotLabel }}</div>
+                <div style="font-size:18px;">{{ ui.seniorEmpty }}</div>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+    </sc-if>
+
+    <!-- ============ TIPS ============ -->
+    <sc-if value="{{ isTips }}" hint-placeholder-val="{{ false }}">
+    <section key="tips" style="animation:viewIn .4s ease;">
+      <div style="margin-bottom:22px;">
+        <h2 style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:28px;margin:0;">{{ ui.tipsTitle }}</h2>
+        <p style="color:#9b8b76;font-size:13px;margin:6px 0 0;">{{ ui.tipsSub }}</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;">
+        <sc-for list="{{ tipsCards }}" as="t" hint-placeholder-count="4">
+          <article style="background:#fffdf8;border:1px solid #ebe0cd;border-radius:18px;padding:24px;border-top:4px solid #c0492b;">
+            <div style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:19px;margin-bottom:4px;">{{ t.title }}</div>
+            <div style="font-size:12px;color:#b39a6e;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">{{ t.sub }}</div>
+            <p style="font-size:14px;line-height:1.7;color:#5f5141;margin:0;">{{ t.body }}</p>
+          </article>
+        </sc-for>
+      </div>
+    </section>
+    </sc-if>
+
+  </main>
+
+  <!-- ============ VIDEO PREVIEW MODAL ============ -->
+  <sc-if value="{{ videoOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeVideo }}" style="position:fixed;inset:0;z-index:100;background:rgba(28,20,14,.74);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;animation:viewIn .25s ease;">
+    <div onClick="{{ stop }}" style="background:#fffdf8;border-radius:20px;overflow:hidden;max-width:560px;width:100%;box-shadow:0 30px 80px rgba(0,0,0,.45);animation:pop .25s ease;">
+      <div onClick="{{ video.onPlay }}" style="position:relative;aspect-ratio:16/9;background:#000;cursor:pointer;">
+        <img src="{{ video.img }}" alt="" style="width:100%;height:100%;object-fit:cover;opacity:.74;">
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+          <div style="width:74px;height:74px;border-radius:50%;background:rgba(192,73,43,.96);display:grid;place-items:center;box-shadow:0 8px 30px rgba(0,0,0,.45);">
+            <span style="color:#fff;font-size:25px;margin-left:5px;">▶</span>
+          </div>
+        </div>
+        <div style="position:absolute;left:0;right:0;bottom:0;padding:14px 18px;background:linear-gradient(transparent,rgba(0,0,0,.72));">
+          <div style="color:#fff;font-size:11px;letter-spacing:1.5px;text-transform:uppercase;opacity:.82;">{{ ui.watchSrc }}</div>
+        </div>
+      </div>
+      <div style="padding:20px 22px 22px;">
+        <div style="font-family:'Noto Serif TC',serif;font-weight:900;font-size:22px;">{{ video.name }}</div>
+        <div style="font-size:13px;color:#a2917b;margin-top:3px;">{{ video.sub }}</div>
+        <p style="font-size:13px;color:#7a6a55;line-height:1.65;margin:12px 0 18px;">{{ ui.watchHint }}</p>
+        <div style="display:flex;gap:10px;">
+          <button onClick="{{ video.onPlay }}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;background:#c0492b;color:#fff;border:none;font-size:13px;font-weight:700;padding:12px;border-radius:999px;cursor:pointer;"><span style="font-size:11px;">▶</span> {{ ui.watchOpen }}</button>
+          <button onClick="{{ video.onAdd }}" style="flex:1;background:#2b211a;color:#fff;border:none;font-size:13px;font-weight:700;padding:12px;border-radius:999px;cursor:pointer;">+ {{ ui.add }}</button>
+        </div>
+        <button onClick="{{ closeVideo }}" style="width:100%;margin-top:10px;background:transparent;border:none;color:#a2917b;font-size:13px;padding:8px;cursor:pointer;">{{ ui.close }}</button>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  state = { tab: 'discover', lang: 'zh', people: 4, cat: 'all', skin: false, plan: {}, seed: 3, seniorDay: 0, videoId: null };
+
+  DAYS = [['週一','Mon'],['週二','Tue'],['週三','Wed'],['週四','Thu'],['週五','Fri'],['週六','Sat'],['週日','Sun']];
+  SLOTS = [['lunch','午餐','Lunch'],['dinner','晚餐','Dinner']];
+  CATS = [['all','全部','All'],['seafood','海鮮','Seafood'],['chinese','中式','Chinese'],['thai','泰式','Thai'],['soup','湯品','Soup'],['noodle','麵食','Noodle'],['quick','快手','Quick']];
+
+  DISHES = [
+    { id:'asam_fish', zh:'亞參魚', en:'Asam Fish', img:'img/asam_fish.jpg', cat:'seafood', cost:18, skin:true,
+      ing:[['馬鮫魚','Mackerel',1,'條','meat'],['番茄','Tomato',3,'顆','veg'],['洋蔥','Onion',1,'顆','veg'],['亞參膏','Asam paste',2,'匙','pantry']] },
+    { id:'mackerel_soup', zh:'番茄馬鮫魚湯', en:'Mackerel Tomato Soup', img:'img/mackerel_soup.jpg', cat:'soup', cost:14, skin:false,
+      ing:[['馬鮫魚','Mackerel',1,'條','meat'],['番茄','Tomato',2,'顆','veg'],['豆腐','Tofu',1,'塊','pantry'],['薑','Ginger',1,'塊','veg']] },
+    { id:'curry_chicken', zh:'咖哩雞', en:'Curry Chicken', img:'img/curry_chicken.jpg', cat:'chinese', cost:16, skin:false,
+      ing:[['雞腿','Chicken thigh',4,'塊','meat'],['馬鈴薯','Potato',2,'顆','veg'],['咖哩粉','Curry powder',3,'匙','pantry'],['椰漿','Coconut milk',200,'毫升','pantry']] },
+    { id:'green_curry', zh:'綠咖哩雞', en:'Green Curry Chicken', img:'img/green_curry.jpg', cat:'thai', cost:17, skin:false,
+      ing:[['雞胸','Chicken breast',300,'克','meat'],['綠咖哩醬','Green curry paste',2,'匙','pantry'],['椰漿','Coconut milk',250,'毫升','pantry'],['茄子','Eggplant',1,'條','veg']] },
+    { id:'tom_yum', zh:'冬蔭功湯', en:'Tom Yum Soup', img:'img/tom_yum.jpg', cat:'thai', cost:16, skin:true,
+      ing:[['鮮蝦','Prawn',8,'尾','meat'],['香茅','Lemongrass',2,'根','veg'],['辣椒','Chili',3,'根','veg'],['南薑','Galangal',1,'塊','veg']] },
+    { id:'pad_thai', zh:'泰式炒河粉', en:'Pad Thai', img:'img/pad_thai.jpg', cat:'thai', cost:14, skin:true,
+      ing:[['河粉','Rice noodle',2,'包','pantry'],['鮮蝦','Prawn',6,'尾','meat'],['雞蛋','Egg',2,'顆','pantry'],['豆芽','Bean sprout',100,'克','veg']] },
+    { id:'pad_krapow', zh:'打拋豬', en:'Pad Krapow', img:'img/pad_krapow.jpg', cat:'thai', cost:13, skin:false,
+      ing:[['豬絞肉','Minced pork',300,'克','meat'],['打拋葉','Holy basil',1,'把','veg'],['辣椒','Chili',4,'根','veg'],['雞蛋','Egg',2,'顆','pantry']] },
+    { id:'soy_chicken', zh:'醬油雞', en:'Soy Sauce Chicken', img:'img/soy_chicken.jpg', cat:'chinese', cost:15, skin:false,
+      ing:[['雞腿','Chicken thigh',4,'塊','meat'],['醬油','Soy sauce',4,'匙','pantry'],['薑','Ginger',1,'塊','veg'],['青蔥','Spring onion',2,'根','veg']] },
+    { id:'steam_prawn', zh:'蒜蓉蒸蝦', en:'Steamed Garlic Prawns', img:'img/steam_prawn.jpg', cat:'seafood', cost:22, skin:true,
+      ing:[['鮮蝦','Prawn',12,'尾','meat'],['蒜頭','Garlic',1,'球','veg'],['粉絲','Glass noodle',1,'包','pantry'],['青蔥','Spring onion',2,'根','veg']] },
+    { id:'herbal_soup', zh:'藥材雞湯', en:'Herbal Chicken Soup', img:'img/herbal_soup.jpg', cat:'soup', cost:20, skin:false,
+      ing:[['雞','Chicken',1,'隻','meat'],['枸杞','Goji berry',2,'匙','pantry'],['紅棗','Red date',8,'顆','pantry'],['當歸','Dang gui',1,'片','pantry']] },
+    { id:'lotus_soup', zh:'蓮藕排骨湯', en:'Lotus Root Pork Rib Soup', img:'img/lotus_soup.jpg', cat:'soup', cost:18, skin:false,
+      ing:[['排骨','Pork rib',500,'克','meat'],['蓮藕','Lotus root',1,'節','veg'],['紅棗','Red date',6,'顆','pantry'],['薑','Ginger',1,'塊','veg']] },
+    { id:'tomato_egg', zh:'番茄炒蛋', en:'Tomato & Egg', img:'img/tomato_egg.jpg', cat:'quick', cost:8, skin:false,
+      ing:[['番茄','Tomato',3,'顆','veg'],['雞蛋','Egg',4,'顆','pantry'],['青蔥','Spring onion',1,'根','veg']] },
+    { id:'tomato_noodle', zh:'番茄蛋麵', en:'Tomato Egg Noodles', img:'img/tomato_noodle.jpg', cat:'noodle', cost:10, skin:false,
+      ing:[['番茄','Tomato',2,'顆','veg'],['雞蛋','Egg',2,'顆','pantry'],['拉麵','Ramen noodle',2,'包','pantry'],['青菜','Greens',1,'把','veg']] },
+    { id:'pork_tofu', zh:'豆腐燜肉', en:'Braised Pork & Tofu', img:'img/pork_tofu.jpg', cat:'chinese', cost:12, skin:false,
+      ing:[['五花肉','Pork belly',300,'克','meat'],['豆腐','Tofu',2,'塊','pantry'],['醬油','Soy sauce',3,'匙','pantry'],['蒜頭','Garlic',3,'瓣','veg']] },
+    { id:'sour_fish', zh:'酸菜魚', en:'Sour Vegetable Fish', img:'img/sour_fish.jpg', cat:'seafood', cost:19, skin:true,
+      ing:[['草魚','Grass carp',1,'條','meat'],['酸菜','Pickled greens',150,'克','veg'],['辣椒','Chili',3,'根','veg'],['花椒','Sichuan pepper',1,'匙','pantry']] },
+    { id:'prawn_ramen', zh:'鮮蝦拉麵', en:'Prawn Ramen', img:'img/prawn_ramen.jpg', cat:'noodle', cost:16, skin:true,
+      ing:[['鮮蝦','Prawn',8,'尾','meat'],['拉麵','Ramen noodle',2,'包','pantry'],['豆腐','Tofu',1,'塊','pantry'],['青菜','Greens',1,'把','veg']] },
+    { id:'chicken_ramen', zh:'雞肉拉麵', en:'Chicken Ramen', img:'img/chicken_ramen.jpg', cat:'noodle', cost:14, skin:false,
+      ing:[['雞胸','Chicken breast',250,'克','meat'],['拉麵','Ramen noodle',2,'包','pantry'],['香菇','Shiitake',6,'朵','veg'],['青菜','Greens',1,'把','veg']] },
+    { id:'grouper', zh:'清蒸石斑', en:'Steamed Grouper', img:'img/grouper.jpg', cat:'seafood', cost:28, skin:true,
+      ing:[['石斑魚','Grouper',1,'條','meat'],['薑','Ginger',1,'塊','veg'],['青蔥','Spring onion',3,'根','veg'],['醬油','Soy sauce',3,'匙','pantry']] },
+    { id:'coconut_soup', zh:'椰汁咖哩雞', en:'Coconut Curry Chicken', img:'img/coconut_soup.jpg', cat:'thai', cost:17, skin:false,
+      ing:[['雞腿','Chicken thigh',4,'塊','meat'],['椰漿','Coconut milk',300,'毫升','pantry'],['咖哩葉','Curry leaf',1,'把','veg'],['青檸','Lime',2,'顆','veg']] },
+    { id:'weekend_feast', zh:'週末海鮮餐', en:'Weekend Seafood Feast', img:'img/weekend_feast.jpg', cat:'seafood', cost:35, skin:true,
+      ing:[['鮮蝦','Prawn',12,'尾','meat'],['石斑魚','Grouper',1,'條','meat'],['青菜','Greens',2,'把','veg'],['冬瓜','Winter melon',1,'塊','veg']] }
+  ];
+
+  zh() { return this.state.lang === 'zh'; }
+  L(zh, en) { return this.state.lang === 'zh' ? zh : en; }
+  fmt(n) { return 'RM ' + (Math.round(n * 100) / 100).toFixed(n % 1 === 0 ? 0 : 2); }
+  factor() { return this.state.people / 4; }
+  byId(id) { return this.DISHES.find(d => d.id === id); }
+  catLabel(c) { const r = this.CATS.find(x => x[0] === c); return r ? this.L(r[1], r[2]) : c; }
+
+  disp(d) {
+    return { id: d.id, name: this.L(d.zh, d.en), sub: this.zh() ? d.en : d.zh, img: d.img,
+      catLabel: this.catLabel(d.cat), cost: '≈ ' + this.fmt(d.cost), skin: !!d.skin,
+      onAdd: () => this.addToPlan(d.id), onWatch: () => this.setState({ videoId: d.id }) };
+  }
+
+  shuffled(arr) {
+    const s = this.state.seed; const a = arr.slice();
+    a.sort((x, y) => ((this.hash(x.id) ^ s) % 997) - ((this.hash(y.id) ^ s) % 997));
+    return a;
+  }
+  hash(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) & 0xffff; return h; }
+
+  eligible() {
+    return this.DISHES.filter(d => {
+      if (this.state.cat !== 'all' && d.cat !== this.state.cat) return false;
+      if (this.state.skin && d.skin) return false;
+      return true;
+    });
+  }
+
+  addToPlan(id) {
+    const plan = { ...this.state.plan };
+    for (let day = 0; day < 7; day++) {
+      for (const s of this.SLOTS) {
+        const key = day + '-' + s[0];
+        if (!plan[key]) { plan[key] = id; this.setState({ plan, tab: this.state.tab }); return; }
+      }
+    }
+  }
+  removeFromPlan(key) { const plan = { ...this.state.plan }; delete plan[key]; this.setState({ plan }); }
+  clearWeek() { this.setState({ plan: {} }); }
+
+  autoFill() {
+    const plan = { ...this.state.plan };
+    const used = new Set(Object.values(plan));
+    let pool = this.shuffled(this.DISHES.filter(d => !(this.state.skin && d.skin)));
+    let pi = 0;
+    for (let day = 0; day < 7; day++) {
+      for (const s of this.SLOTS) {
+        const key = day + '-' + s[0];
+        if (plan[key]) continue;
+        let guard = 0;
+        while (guard < pool.length && used.has(pool[pi % pool.length].id)) { pi++; guard++; }
+        const pick = pool[pi % pool.length]; pi++;
+        plan[key] = pick.id; used.add(pick.id);
+      }
+    }
+    this.setState({ plan });
+  }
+
+  plannedDishes() { return Object.values(this.state.plan).map(id => this.byId(id)).filter(Boolean); }
+
+  watchOnYouTube(d) {
+    const q = (this.zh() ? d.zh : d.en) + ' ' + this.L('做法 食譜', 'recipe how to cook');
+    window.open('https://www.youtube.com/results?search_query=' + encodeURIComponent(q), '_blank', 'noopener');
+  }
+
+  shoppingGroups() {
+    const f = this.factor();
+    const map = {};
+    for (const d of this.plannedDishes()) {
+      for (const [zh, en, qty, unit, grp] of d.ing) {
+        const key = zh + '|' + unit;
+        if (!map[key]) map[key] = { zh, en, qty: 0, unit, grp };
+        map[key].qty += qty * f;
+      }
+    }
+    const groupOrder = [['veg','蔬果','Produce'],['meat','肉類海鮮','Meat & Seafood'],['pantry','雜貨調味','Pantry']];
+    return groupOrder.map(([g, zh, en]) => {
+      const items = Object.values(map).filter(m => m.grp === g).map(m => {
+        let q = m.qty; let qs = (Math.round(q * 10) / 10);
+        qs = qs % 1 === 0 ? qs.toString() : qs.toFixed(1);
+        return { name: this.L(m.zh, m.en), sub: this.zh() ? m.en : m.zh, qty: qs + ' ' + this.L(m.unit, m.unit) };
+      });
+      return { label: this.L(zh, en), items, n: items.length };
+    }).filter(g => g.items.length);
+  }
+
+  costData() {
+    const f = this.factor();
+    const dishes = this.plannedDishes();
+    const total = dishes.reduce((a, d) => a + d.cost * f, 0);
+    const byCat = {};
+    for (const d of dishes) byCat[d.cat] = (byCat[d.cat] || 0) + d.cost * f;
+    const rows = Object.entries(byCat).sort((a, b) => b[1] - a[1]).map(([c, v]) => ({
+      label: this.catLabel(c), value: this.fmt(v), pct: total ? Math.round(v / total * 100) : 0
+    }));
+    return { total: this.fmt(total), rows, count: dishes.length,
+      perMeal: dishes.length ? this.fmt(total / dishes.length) : this.fmt(0) };
+  }
+
+  MARKET = [
+    ['番茄','Tomato',4.20,4.80,5.10,-3],
+    ['洋蔥','Onion',3.60,3.90,4.40,2],
+    ['辣椒','Chili',9.50,10.20,12.00,5],
+    ['蒜頭','Garlic',11.00,11.50,9.80,-1],
+    ['生薑','Ginger',8.00,8.60,7.50,4]
+  ];
+  SEAFOOD = [
+    ['甘望魚','Kembung','img/market_kembung.jpg',12],
+    ['紅魚','Red Snapper','img/market_merah.jpg',28],
+    ['馬鮫魚','Tenggiri','img/market_tenggiri.jpg',32],
+    ['鮮蝦','Prawns','img/market_udang.jpg',35]
+  ];
+
+  TIPS = [
+    ['鮮魚挑選','Picking Fresh Fish','魚眼清澈、魚鰓鮮紅、按壓魚身能迅速回彈，就是新鮮的好魚。','Clear eyes, bright red gills and flesh that springs back means the fish is fresh.'],
+    ['控制預算','Stay on Budget','一週以一到兩道海鮮為主、其餘搭配雞肉與蔬菜，花費最均衡。','Anchor the week with one or two seafood dishes; fill the rest with chicken and veg.'],
+    ['敏感體質','Sensitive Skin','開啟「避開發物」會自動略過蝦蟹等易過敏食材。','Turn on "avoid triggers" to skip prawns, crab and other common allergens.'],
+    ['備料省時','Prep Ahead','週末把薑蒜辣椒切好分裝冷藏，平日下廚可省一半時間。','Chop ginger, garlic and chili on the weekend to halve weekday cooking time.']
+  ];
+
+  navStyle(active) {
+    return 'flex:none;display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:9px 16px;border:none;border-radius:13px;cursor:pointer;text-align:left;'
+      + (active ? 'background:#2b211a;color:#fff;' : 'background:transparent;color:#6f5f4c;');
+  }
+  chipStyle(active) {
+    return 'flex:none;border:1px solid ' + (active ? '#c0492b' : '#e0d3bd') + ';background:' + (active ? '#c0492b' : '#fffdf8')
+      + ';color:' + (active ? '#fff' : '#7a5a3f') + ';font-size:13px;font-weight:600;padding:7px 15px;border-radius:999px;cursor:pointer;';
+  }
+  langStyle(active) {
+    return 'border:none;background:' + (active ? '#fff' : 'transparent') + ';color:' + (active ? '#c0492b' : '#9b8b76')
+      + ';font-size:13px;font-weight:700;padding:5px 13px;border-radius:999px;cursor:pointer;box-shadow:' + (active ? '0 1px 3px rgba(0,0,0,.1)' : 'none') + ';';
+  }
+
+  renderVals() {
+    const tab = this.state.tab;
+    const NAV = [
+      ['discover','探索','Discover'],['plan','餐表','Plan'],['shop','採買','Shop'],
+      ['market','行情','Market'],['senior','樂齡','Senior'],['tips','小貼士','Tips']
+    ];
+    const ui = {
+      people: this.L('人','ppl'),
+      heroTag: this.L('反向流程 · 選菜就好','Reverse flow · just pick'),
+      heroTitle: this.L('先選想吃的菜，採買清單自動生成','Pick what you crave — we build the shopping list'),
+      heroBody: this.L('選菜 → 抽食材 → 一週餐表與花費。專為亞庇家庭晚餐而設，對比三地物價、貼心避開敏感食材。',
+        'Choose dishes, extract ingredients, plan the week and track cost — built for Kota Kinabalu family dinners.'),
+      visits: this.L('👀 累計造訪 12,480 次 · 今日 96','👀 12,480 visits · 96 today'),
+      recoTitle: this.L('今晚的推薦','Tonight\u2019s picks'),
+      recoSub: this.L('依用餐人數估價，一鍵排入餐表','Priced for your party — add to the week in one tap'),
+      shuffle: this.L('換一批','Shuffle'),
+      skin: this.L('皮膚敏感','Skin sensitive'),
+      skinTag: this.L('發物','trigger'),
+      add: this.L('排入','Add'),
+      watch: this.L('看做法','Watch'),
+      watchSrc: this.L('YouTube 食譜影片','YouTube recipe video'),
+      watchOpen: this.L('在 YouTube 觀看','Watch on YouTube'),
+      watchHint: this.L('點擊播放，於 YouTube 觀看這道菜的完整做法影片，再決定要不要排入餐表。','Tap play to watch the full recipe on YouTube, then decide whether to add it to your week.'),
+      close: this.L('關閉','Close'),
+      planTitle: this.L('一週餐表','Weekly Plan'),
+      planSub: this.L('午餐與晚餐 · 點空格新增，或一鍵生成','Lunch & dinner — tap a slot or auto-fill the week'),
+      autoFill: this.L('一鍵生成','Auto-fill'),
+      clear: this.L('清空','Clear'),
+      shopTitle: this.L('採買清單','Shopping List'),
+      shopSub: this.L('依餐表自動聚合食材，並估算總花費','Aggregated from your plan, with an estimated total'),
+      items: this.L('項','items'),
+      estTotal: this.L('預估總花費','Estimated Total'),
+      perMeal: this.L('每餐平均','Avg / meal'),
+      emptyShop: this.L('餐表還是空的，先去選幾道菜吧。','Your week is empty — pick a few dishes first.'),
+      goPick: this.L('去選菜','Pick dishes'),
+      marketTitle: this.L('三地市場行情','Market Prices'),
+      marketSub: this.L('亞庇 · 吉隆坡 · 台北 物價對比（RM / kg）','Kota Kinabalu · Kuala Lumpur · Taipei (RM / kg)'),
+      item: this.L('品項','Item'),
+      seafoodTitle: this.L('亞庇海鮮參考','KK Seafood Reference'),
+      seafoodSrc: this.L('來源：麗都 · 生源市場','Source: Lido & Sang Yuan markets'),
+      seniorKicker: this.L('樂齡模式','Senior Mode'),
+      seniorTitle: this.L('今天吃這些','Today\u2019s Meals'),
+      seniorEmpty: this.L('尚未安排','Not planned yet'),
+      tipsTitle: this.L('小貼士','Kitchen Tips'),
+      tipsSub: this.L('讓下廚更輕鬆的實用建議','Practical advice to make cooking easier'),
+    };
+    const slotLabel = (s) => this.L(s[1], s[2]);
+    const planDays = this.DAYS.map(([zh, en], di) => ({
+      zh, en,
+      slots: this.SLOTS.map(s => {
+        const key = di + '-' + s[0];
+        const id = this.state.plan[key];
+        const d = id ? this.byId(id) : null;
+        return d
+          ? { has: true, empty: false, slotLabel: slotLabel(s), name: this.L(d.zh, d.en),
+              cost: this.fmt(d.cost), img: d.img, onRemove: () => this.removeFromPlan(key),
+              cellStyle: 'background:#fffdf8;border:1px solid #ebe0cd;border-radius:14px;' }
+          : { has: false, empty: true, slotLabel: slotLabel(s),
+              cellStyle: 'background:transparent;' };
+      })
+    }));
+    const cost = this.costData();
+    const costRows = cost.rows.map(r => ({ ...r,
+      barStyle: 'height:100%;width:' + r.pct + '%;background:linear-gradient(90deg,#e7b04a,#c0492b);border-radius:999px;' }));
+    const shopGroups = this.shoppingGroups();
+    const marketRows = this.MARKET.map(([zh, en, kk, kl, tpe, mom]) => ({
+      name: this.L(zh, en), sub: this.zh() ? en : zh,
+      kk: kk.toFixed(2), kl: kl.toFixed(2), tpe: tpe.toFixed(2),
+      mom: (mom > 0 ? '+' : '') + mom + '%',
+      momStyle: 'font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;white-space:nowrap;'
+        + (mom > 0 ? 'background:#f7e3e0;color:#c0492b;' : 'background:#e3eddc;color:#5c7a4a;')
+    }));
+    const seafoodRows = this.SEAFOOD.map(([zh, en, img, p]) => ({
+      name: this.L(zh, en), sub: this.zh() ? en : zh, img, price: this.fmt(p)
+    }));
+    const sd = this.state.seniorDay;
+    const seniorSlots = this.SLOTS.map(s => {
+      const id = this.state.plan[sd + '-' + s[0]];
+      const d = id ? this.byId(id) : null;
+      return d
+        ? { has: true, empty: false, slotLabel: slotLabel(s), name: this.L(d.zh, d.en), sub: this.zh() ? d.en : d.zh, img: d.img }
+        : { has: false, empty: true, slotLabel: slotLabel(s) };
+    });
+    const tipsCards = this.TIPS.map(([zh, en, bz, be]) => ({
+      title: this.L(zh, en), sub: en, body: this.L(bz, be)
+    }));
+    const vd = this.state.videoId ? this.byId(this.state.videoId) : null;
+    const video = vd ? {
+      name: this.L(vd.zh, vd.en), sub: this.zh() ? vd.en : vd.zh, img: vd.img,
+      onPlay: () => this.watchOnYouTube(vd),
+      onAdd: () => { this.addToPlan(vd.id); this.setState({ videoId: null }); }
+    } : null;
+    const navItems = NAV.map(([id, zh, en]) => ({
+      label: this.L(zh, en), sub: en, onClick: () => this.setState({ tab: id }), style: this.navStyle(tab === id)
+    }));
+    const catChips = this.CATS.map(([id, zh, en]) => ({
+      label: this.L(zh, en), onClick: () => this.setState({ cat: id }), style: this.chipStyle(this.state.cat === id)
+    }));
+    const reco = this.shuffled(this.eligible()).slice(0, 8).map(d => this.disp(d));
+
+    return {
+      people: this.state.people, ui,
+      incPeople: () => this.setState({ people: Math.min(12, this.state.people + 1) }),
+      decPeople: () => this.setState({ people: Math.max(1, this.state.people - 1) }),
+      setZh: () => this.setState({ lang: 'zh' }), setEn: () => this.setState({ lang: 'en' }),
+      zhBtnStyle: this.langStyle(this.zh()), enBtnStyle: this.langStyle(!this.zh()),
+      navItems,
+      isDiscover: tab === 'discover', isPlan: tab === 'plan', isShop: tab === 'shop',
+      isMarket: tab === 'market', isSenior: tab === 'senior', isTips: tab === 'tips',
+      heroSteps: [{ n: 1, label: this.L('選菜','Pick dishes') }, { n: 2, label: this.L('抽食材','Get ingredients') }, { n: 3, label: this.L('採買 + 花費','Shop + cost') }],
+      shuffle: () => this.setState({ seed: this.state.seed + 7 }),
+      catChips,
+      toggleSkin: () => this.setState({ skin: !this.state.skin }),
+      skinTrackStyle: 'width:34px;height:18px;border-radius:999px;background:' + (this.state.skin ? '#5c7a4a' : '#d8cab2') + ';position:relative;display:inline-block;flex:none;transition:background .2s;',
+      skinKnobStyle: 'position:absolute;top:2px;left:' + (this.state.skin ? '18px' : '2px') + ';width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 2px rgba(0,0,0,.2);',
+      recoCards: reco,
+      goDiscover: () => this.setState({ tab: 'discover' }),
+      planDays, autoFill: () => this.autoFill(), clearWeek: () => this.clearWeek(),
+      shopEmpty: shopGroups.length === 0, shopHas: shopGroups.length > 0, shopGroups,
+      costTotal: cost.total, costPerMeal: cost.perMeal, costRows,
+      costNote: this.L(this.state.people + ' 人份 · ' + cost.count + ' 餐', cost.count + ' meals · for ' + this.state.people),
+      marketRows, seafoodRows,
+      seniorDayZh: this.DAYS[sd][0], seniorDayEn: this.DAYS[sd][1], seniorSlots,
+      seniorPrev: () => this.setState({ seniorDay: (sd + 6) % 7 }),
+      seniorNext: () => this.setState({ seniorDay: (sd + 1) % 7 }),
+      tipsCards,
+      videoOpen: !!vd, video,
+      closeVideo: () => this.setState({ videoId: null }),
+      stop: (e) => { if (e && e.stopPropagation) e.stopPropagation(); }
+    };
+  }
+}
+</script>
+</body>
+</html>
