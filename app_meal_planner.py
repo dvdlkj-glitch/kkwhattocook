@@ -66,14 +66,22 @@ def _bump_visits(supabase):
             supabase.table("visits").insert(
                 {"session_id": str(uuid.uuid4())[:12]}).execute()
             st.session_state["_visit_logged"] = True
+        now = time.monotonic()
+        cached = st.session_state.get("_visit_counts")
+        if cached and now - cached.get("ts", 0) < 120:
+            return cached.get("total"), cached.get("today")
         total = supabase.table("visits").select(
             "id", count="exact").limit(1).execute().count
         import datetime as _dt
         t0 = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
         today = supabase.table("visits").select(
             "id", count="exact").gte("ts", t0).limit(1).execute().count
+        st.session_state["_visit_counts"] = {"total": total, "today": today, "ts": now}
         return total, today
     except Exception:
+        cached = st.session_state.get("_visit_counts")
+        if cached:
+            return cached.get("total"), cached.get("today")
         return None, None
 
 
@@ -127,7 +135,7 @@ html, body, [class*="css"]{ font-family:'Noto Sans TC',system-ui,sans-serif; col
 
 /* ---------- HERO ---------- */
 .hero{ position:relative; border-radius:22px; overflow:hidden; border:1px solid var(--line2);
-  min-height:230px; display:flex; align-items:flex-end; animation:floatUp .5s ease both;
+  min-height:230px; display:flex; align-items:flex-end;
   background:#2b211a; }
 .hero img, .hero video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .hero .scrim{ position:absolute; inset:0;
@@ -150,7 +158,7 @@ html, body, [class*="css"]{ font-family:'Noto Sans TC',system-ui,sans-serif; col
 .card,.day-card,.pkg-card,.stat,
 div[data-testid="stVerticalBlockBorderWrapper"]{
   background:var(--card); border:1px solid var(--line)!important; border-radius:18px;
-  box-shadow:var(--shadow); animation:floatUp .4s ease both;
+  box-shadow:var(--shadow);
 }
 .card{ padding:18px 20px; margin-bottom:14px; line-height:1.7; }
 .pkg-card{ padding:10px 10px 8px; text-align:center; transition:transform .18s ease, box-shadow .18s ease; }
@@ -568,14 +576,44 @@ if not CLIENTS_OK:
     st.error("⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
              "市場行情與樂齡專區仍可使用，但「找菜／餐表／採買清單」需要設定 Secrets。")
 
-# 導覽：依新設計稿順序——找菜(探索) 為首頁，再餐表 / 採買 / 花費 / 行情 / 樂齡 / 貼士
-tab_find, tab_week, tab_shop, tab_budget, tab_market, tab_elderly, tab_tips = st.tabs(
-    ["🍳 探索找菜", "📅 一週餐表", "🛒 採買清單",
-     "💰 花費總覽", "📊 市場行情", "👵 樂齡專區", "💡 小貼士"])
+# 導覽：只渲染目前選到的 Dashboard 區塊，避免 st.tabs 每次互動都重建所有內容。
+DASHBOARD_SECTIONS = [
+    ("find", "🍳 探索找菜"),
+    ("week", "📅 一週餐表"),
+    ("shop", "🛒 採買清單"),
+    ("budget", "💰 花費總覽"),
+    ("market", "📊 市場行情"),
+    ("elderly", "👵 樂齡專區"),
+    ("tips", "💡 小貼士"),
+]
+_dashboard_labels = [label for _, label in DASHBOARD_SECTIONS]
+_dashboard_default = st.session_state.get("_dashboard_active_label", _dashboard_labels[0])
+if _dashboard_default not in _dashboard_labels:
+    _dashboard_default = _dashboard_labels[0]
+try:
+    _dashboard_label = st.pills(
+        "Dashboard",
+        _dashboard_labels,
+        default=_dashboard_default,
+        key="dashboard_nav",
+        label_visibility="collapsed",
+    )
+except Exception:
+    _dashboard_label = st.radio(
+        "Dashboard",
+        _dashboard_labels,
+        index=_dashboard_labels.index(_dashboard_default),
+        horizontal=True,
+        key="dashboard_nav_radio",
+        label_visibility="collapsed",
+    )
+_dashboard_label = _dashboard_label or _dashboard_default
+st.session_state["_dashboard_active_label"] = _dashboard_label
+_active_section = dict((label, section) for section, label in DASHBOARD_SECTIONS)[_dashboard_label]
 
 
 # ================ 📊 市場行情 ================
-with tab_market:
+if _active_section == "market":
     st.markdown("<div class='section-title'>📊 亞庇官方物價月報（上月 vs 本月）</div>",
                 unsafe_allow_html=True)
     try:
@@ -637,7 +675,7 @@ with tab_market:
 
 
 # ================ 🔍 找菜（YouTube 搜尋 → 卡片 → 內嵌播放 → 排入餐表） ================
-with tab_find:
+if _active_section == "find":
     st.markdown("<div class='section-title'>🔍 想煮什麼？YouTube 上找，找到就排進餐表</div>",
                 unsafe_allow_html=True)
 
@@ -941,7 +979,7 @@ with tab_find:
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid}")
             st.caption("點播放器右下角可全螢幕。")
 
-with tab_week:
+if _active_section == "week":
     st.markdown("<div class='section-title'>📅 一週餐表</div>", unsafe_allow_html=True)
 
     if not CLIENTS_OK:
@@ -1211,7 +1249,7 @@ with tab_week:
                     height=0)
                 ss.scroll_to_player = False
 
-with tab_shop:
+if _active_section == "shop":
     st.markdown("<div class='section-title'>🛒 本週採買清單（YouTube 食材自動加總）</div>",
                 unsafe_allow_html=True)
     if not CLIENTS_OK:
@@ -1287,7 +1325,7 @@ with tab_shop:
 
 
 # ================ 💰 花費總覽 ================
-with tab_budget:
+if _active_section == "budget":
     st.markdown("<div class='section-title'>💰 本週每日餐費估算（依市場行情粗估）</div>",
                 unsafe_allow_html=True)
     if not CLIENTS_OK:
@@ -1331,7 +1369,7 @@ with tab_budget:
 
 
 # ================ 👵 樂齡專區 ================
-with tab_elderly:
+if _active_section == "elderly":
     st.markdown("<div class='section-title'>👵 適合家有年長者的食譜</div>",
                 unsafe_allow_html=True)
     st.session_state.setdefault("people_eld", 4)
@@ -1354,7 +1392,7 @@ with tab_elderly:
 
 
 # ================ 💡 小貼士 ================
-with tab_tips:
+if _active_section == "tips":
     t1, t2 = st.columns(2)
     with t1:
         st.markdown("<div class='card'><b style='color:#2b211a'>🧺 市場採買小貼士</b><br>" +
