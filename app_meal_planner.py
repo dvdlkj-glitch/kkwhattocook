@@ -686,6 +686,7 @@ if _active_section == "find":
         ss.setdefault("find_cards", [])
         ss.setdefault("play_vid", None)
         ss.setdefault("play_title", "")
+        ss.setdefault("scroll_to_find_player", False)
         ss.setdefault("people", 4)
         ss.setdefault("skin", False)
         ss.setdefault("cuisine", "全部")
@@ -794,6 +795,36 @@ if _active_section == "find":
                          horizontal=True, key="rec_mode", label_visibility="collapsed")
         st.caption("🎲 隨機精選＝每類給 5 道靈感　·　🧊 用現有食材煮＝依你勾的食材排出最能煮的菜")
 
+        def _play_recipe_video(cz, dish_name):
+            """在本頁播放器播放推薦菜色的第一支 YouTube 做法。"""
+            cards = []
+            try:
+                vid = R.get_cached_video_id(supabase, dish_name)
+                if vid:
+                    rec = R.get_cached_recipe(supabase, vid)
+                    ss.play_vid = vid
+                    ss.play_title = (rec or {}).get("title") or dish_name
+                    ss.scroll_to_find_player = True
+                    return True
+
+                cards = R.get_candidates(supabase, dish_name)
+                if not cards:
+                    q = f"{CUISINE_KW.get(cz, '')} {dish_name}".strip()
+                    cards = R.search_dishes(q, YT_KEY, max_results=6)
+                    if cards:
+                        R.save_candidates(supabase, dish_name, cards)
+                if not cards:
+                    return False
+
+                card = cards[0]
+                ss.play_vid = card["video_id"]
+                ss.play_title = card.get("title") or dish_name
+                ss.scroll_to_find_player = True
+                return True
+            except Exception as exc:
+                st.error(f"影片載入失敗：{exc}")
+                return True
+
         def _render_rec_row(cz, dishes):
             _cols = st.columns(5)
             for _i, (_name, _lo, _hi) in enumerate(dishes):
@@ -805,11 +836,11 @@ if _active_section == "find":
                             f"<div class='rec-name'>{_name}{_fl}</div>"
                             f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
                             unsafe_allow_html=True)
-                        # 看做法：到 YouTube 搜尋這道菜的做法（新分頁開啟，像設計稿一樣）
-                        _wq = (CUISINE_KW.get(cz, "") + " " + _name + " 做法 食譜").strip()
-                        _yt = ("https://www.youtube.com/results?search_query="
-                               + urllib.parse.quote(_wq))
-                        st.link_button("▶ 看做法", _yt, use_container_width=True)
+                        if st.button("▶ 看做法", key=f"rec_play_{cz}_{_i}",
+                                     use_container_width=True):
+                            with st.spinner(f"正在找「{_name}」的 YouTube 做法…"):
+                                if not _play_recipe_video(cz, _name):
+                                    st.error("找不到對應影片，換一道試試。")
                         _pop = st.popover("➕ 排入", use_container_width=True)
                         with _pop:
                             _d = st.date_input("排到哪一天", value=date.today(), key=f"rd_{cz}_{_i}")
@@ -946,6 +977,7 @@ if _active_section == "find":
                                      use_container_width=True):
                             ss.play_vid = card["video_id"]
                             ss.play_title = card["title"]
+                            ss.scroll_to_find_player = True
                         with st.popover("➕ 排入餐表", use_container_width=True):
                             d = st.date_input("排到哪一天", value=date.today(),
                                               key=f"d_{card['video_id']}")
@@ -978,6 +1010,13 @@ if _active_section == "find":
                     st.rerun()
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid}")
             st.caption("點播放器右下角可全螢幕。")
+            if ss.get("scroll_to_find_player"):
+                components.html(
+                    "<script>try{var d=window.parent.document;"
+                    "var t=d.getElementById('find-player');"
+                    "if(t){t.scrollIntoView({behavior:'smooth',block:'center'});}}catch(e){}</script>",
+                    height=0)
+                ss.scroll_to_find_player = False
 
 if _active_section == "week":
     st.markdown("<div class='section-title'>📅 一週餐表</div>", unsafe_allow_html=True)
