@@ -361,7 +361,8 @@ def cost_badge(ingredients):
     if not est:
         return "<span class='cost-badge'>💰 RM —</span>"
     lo, hi, _m, _c = est
-    return f"<span class='cost-badge'>💰 估 RM {lo}–{hi}</span>"
+    est_label = "est." if st.session_state.get("app_lang") == "en" else "估"
+    return f"<span class='cost-badge'>💰 {est_label} RM {lo}–{hi}</span>"
 
 
 def dish_mid_cost(ingredients):
@@ -393,7 +394,8 @@ def people_stepper(value, key_prefix, lo=2, hi=6, label="👨‍👩‍👧 用�
         if st.button("＋", key=f"{key_prefix}_plus", use_container_width=True):
             v = min(hi, value + 1)
     with c2:
-        st.markdown(f"<div class='people-count'>{v} 人</div>", unsafe_allow_html=True)
+        unit = "people" if st.session_state.get("app_lang") == "en" else "人"
+        st.markdown(f"<div class='people-count'>{v} {unit}</div>", unsafe_allow_html=True)
     return v
 
 
@@ -522,18 +524,86 @@ def scaled_cost_badge(ingredients, people):
         return "<span class='cost-badge'>💰 RM —</span>"
     lo, hi, _m, _c = est
     f = people_factor(people)
-    return f"<span class='cost-badge'>💰 估 RM {int(round(lo * f))}–{int(round(hi * f))}</span>"
+    est_label = "est." if st.session_state.get("app_lang") == "en" else "估"
+    return f"<span class='cost-badge'>💰 {est_label} RM {int(round(lo * f))}–{int(round(hi * f))}</span>"
 
+
+LANG_OPTIONS = {"中文": "zh", "English": "en"}
+LANG_LABELS = {v: k for k, v in LANG_OPTIONS.items()}
+
+
+def ui(zh, en):
+    """Return UI text for the selected language while keeping data keys unchanged."""
+    return en if st.session_state.get("app_lang") == "en" else zh
+
+
+def cuisine_label(cuisine):
+    en = {
+        "全部": "All",
+        "中式": "Chinese",
+        "台式": "Taiwanese",
+        "西式": "Western",
+        "泰式": "Thai",
+        "馬來西亞": "Malaysian",
+        "印尼": "Indonesian",
+    }
+    return en.get(cuisine, cuisine) if st.session_state.get("app_lang") == "en" else cuisine
+
+
+def slot_label(slot):
+    en = {"午": "Lunch", "晚": "Dinner"}
+    zh = {"午": "午餐", "晚": "晚餐"}
+    return en.get(slot, slot) if st.session_state.get("app_lang") == "en" else zh.get(slot, slot)
+
+
+def slot_heading(slot):
+    return f"{'🍱' if slot == '午' else '🌙'} {slot_label(slot)}"
+
+
+def weekday_short(index):
+    zh = ["一", "二", "三", "四", "五", "六", "日"]
+    en = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    return en[index] if st.session_state.get("app_lang") == "en" else f"週{zh[index]}"
+
+
+def skin_note():
+    return ui(
+        SKIN_NOTE,
+        "💧 Sensitive-skin mode: dishes with common triggers such as shrimp, crab, shellfish, squid, "
+        "eggplant, bamboo shoots, and spicy ingredients are marked ⚠. This is only a food reference; "
+        "please follow medical advice for diagnosed allergies.",
+    )
+
+
+
+# ---------------------------------------------------------------- 語言
+_lang_default = LANG_LABELS.get(st.session_state.get("app_lang", "zh"), "中文")
+try:
+    _lang_choice = st.pills(
+        "Language / 語言",
+        list(LANG_OPTIONS.keys()),
+        default=_lang_default,
+        key="app_lang_selector",
+    )
+except Exception:
+    _lang_choice = st.radio(
+        "Language / 語言",
+        list(LANG_OPTIONS.keys()),
+        index=list(LANG_OPTIONS.keys()).index(_lang_default),
+        horizontal=True,
+        key="app_lang_selector_radio",
+    )
+st.session_state["app_lang"] = LANG_OPTIONS.get(_lang_choice or _lang_default, "zh")
 
 
 # ---------------------------------------------------------------- 頁首：品牌列 + Hero
 # 品牌列（沿用設計稿的 logo「煮」＋中英標題）
-st.markdown("""
+st.markdown(f"""
 <div class="appbar">
   <div class="logo">煮</div>
   <div class="brand">
-    <div class="t">今天煮什麼？</div>
-    <div class="s">What to cook today · 亞庇 Kota Kinabalu</div>
+    <div class="t">{ui("今天煮什麼？", "What to Cook Today?")}</div>
+    <div class="s">{ui("What to cook today · 亞庇 Kota Kinabalu", "Kota Kinabalu meal planning helper")}</div>
   </div>
 </div>
 """, unsafe_allow_html=True)
@@ -546,10 +616,15 @@ _hero_poster = (f"data:image/jpeg;base64,{_img_b64(_hero_img)}"
 
 _vt, _vd = _bump_visits(supabase)
 if _vt:
-    _td = f" · 今日 {_vd}" if _vd is not None else ""
-    _visits_html = f"👀 累計造訪 {_vt:,} 次{_td}"
+    if st.session_state.get("app_lang") == "en":
+        _td = f" · today {_vd}" if _vd is not None else ""
+        _visits_html = f"👀 {_vt:,} visits{_td}"
+    else:
+        _td = f" · 今日 {_vd}" if _vd is not None else ""
+        _visits_html = f"👀 累計造訪 {_vt:,} 次{_td}"
 else:
-    _visits_html = "👀 為亞庇家庭設計的買菜煮飯小幫手"
+    _visits_html = ui("👀 為亞庇家庭設計的買菜煮飯小幫手",
+                      "👀 A market-to-meal helper for Kota Kinabalu families")
 
 st.markdown(f"""
 <div class="hero">
@@ -557,14 +632,16 @@ st.markdown(f"""
          poster="{_hero_poster}" src="{_BG_VIDEO_URL}"></video>
   <div class="scrim"></div>
   <div class="inner">
-    <div class="tag">反向流程 · 選菜就好</div>
-    <h1>先選想吃的菜，<br>採買清單自動生成</h1>
-    <p>選菜 → YouTube 抽食材 → 一週餐表與花費。專為亞庇家庭晚餐而設，
-       對比 <span class="gold">麗都 &amp; 生源市場</span> 行情、貼心避開敏感食材。</p>
+    <div class="tag">{ui("反向流程 · 選菜就好", "Reverse flow · Pick the dish first")}</div>
+    <h1>{ui("先選想吃的菜，<br>採買清單自動生成", "Pick what you want to eat,<br>then auto-build the shopping list")}</h1>
+    <p>{ui("選菜 → YouTube 抽食材 → 一週餐表與花費。專為亞庇家庭晚餐而設，對比 ",
+           "Choose a dish → extract ingredients from YouTube → plan the week and estimate cost. Built for Kota Kinabalu dinners with ")}
+       <span class="gold">{ui("麗都 &amp; 生源市場", "Lido &amp; local market")}</span>
+       {ui(" 行情、貼心避開敏感食材。", " references and sensitive-ingredient hints.")}</p>
     <div class="steps">
-      <div class="step"><span class="n">1</span>選菜</div>
-      <div class="step"><span class="n">2</span>抽食材</div>
-      <div class="step"><span class="n">3</span>採買 + 花費</div>
+      <div class="step"><span class="n">1</span>{ui("選菜", "Pick")}</div>
+      <div class="step"><span class="n">2</span>{ui("抽食材", "Extract")}</div>
+      <div class="step"><span class="n">3</span>{ui("採買 + 花費", "Shop + Cost")}</div>
     </div>
     <div style="margin-top:18px;font-size:12px;color:rgba(255,255,255,.62);">{_visits_html}</div>
   </div>
@@ -573,23 +650,32 @@ st.markdown(f"""
 st.write("")
 
 if not CLIENTS_OK:
-    st.error("⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
-             "市場行情與樂齡專區仍可使用，但「找菜／餐表／採買清單」需要設定 Secrets。")
+    st.error(ui(
+        "⚠️ 找不到 API 金鑰（ANTHROPIC / SUPABASE / YOUTUBE）。"
+        "市場行情與樂齡專區仍可使用，但「找菜／餐表／採買清單」需要設定 Secrets。",
+        "⚠️ API keys were not found (ANTHROPIC / SUPABASE / YOUTUBE). "
+        "Market prices and the senior section still work, but recipe search, meal plans, "
+        "and shopping lists need Secrets configured.",
+    ))
 
 # 導覽：只渲染目前選到的 Dashboard 區塊，避免 st.tabs 每次互動都重建所有內容。
 DASHBOARD_SECTIONS = [
-    ("find", "🍳 探索找菜"),
-    ("week", "📅 一週餐表"),
-    ("shop", "🛒 採買清單"),
-    ("budget", "💰 花費總覽"),
-    ("market", "📊 市場行情"),
-    ("elderly", "👵 樂齡專區"),
-    ("tips", "💡 小貼士"),
+    ("find", ui("🍳 探索找菜", "🍳 Explore Recipes")),
+    ("week", ui("📅 一週餐表", "📅 Weekly Plan")),
+    ("shop", ui("🛒 採買清單", "🛒 Shopping List")),
+    ("budget", ui("💰 花費總覽", "💰 Budget")),
+    ("market", ui("📊 市場行情", "📊 Market Prices")),
+    ("elderly", ui("👵 樂齡專區", "👵 Senior Meals")),
+    ("tips", ui("💡 小貼士", "💡 Tips")),
 ]
+_dashboard_sections = [section for section, _ in DASHBOARD_SECTIONS]
+_dashboard_label_by_section = dict(DASHBOARD_SECTIONS)
+_dashboard_section_by_label = {label: section for section, label in DASHBOARD_SECTIONS}
 _dashboard_labels = [label for _, label in DASHBOARD_SECTIONS]
-_dashboard_default = st.session_state.get("_dashboard_active_label", _dashboard_labels[0])
-if _dashboard_default not in _dashboard_labels:
-    _dashboard_default = _dashboard_labels[0]
+_dashboard_default_section = st.session_state.get("_dashboard_active_section", _dashboard_sections[0])
+if _dashboard_default_section not in _dashboard_sections:
+    _dashboard_default_section = _dashboard_sections[0]
+_dashboard_default = _dashboard_label_by_section[_dashboard_default_section]
 try:
     _dashboard_label = st.pills(
         "Dashboard",
@@ -608,16 +694,17 @@ except Exception:
         label_visibility="collapsed",
     )
 _dashboard_label = _dashboard_label or _dashboard_default
-st.session_state["_dashboard_active_label"] = _dashboard_label
-_active_section = dict((label, section) for section, label in DASHBOARD_SECTIONS)[_dashboard_label]
+_active_section = _dashboard_section_by_label[_dashboard_label]
+st.session_state["_dashboard_active_section"] = _active_section
 
 
 # ================ 📊 市場行情 ================
 if _active_section == "market":
-    st.markdown("<div class='section-title'>📊 亞庇官方物價月報（上月 vs 本月）</div>",
+    st.markdown(f"<div class='section-title'>{ui('📊 亞庇官方物價月報（上月 vs 本月）', '📊 KK Official Price Report (Previous Month vs This Month)')}</div>",
                 unsafe_allow_html=True)
     try:
-        with st.spinner("正在載入官方數據（首次約 20–60 秒，之後全站共用快取）…"):
+        with st.spinner(ui("正在載入官方數據（首次約 20–60 秒，之後全站共用快取）…",
+                           "Loading official data (first load may take 20-60 seconds; then it is cached)…")):
             otable, ometa = fetch_official_mom()
         if len(otable):
             ups = int(otable["變化"].str.startswith("🔺").sum())
@@ -625,36 +712,56 @@ if _active_section == "market":
             flat = len(otable) - ups - downs
             st.markdown(f"""
             <div class='stats-row'>
-              <div class='stat'><div class='v'>🔺 {ups} 項</div><div class='l'>本月變貴</div></div>
-              <div class='stat'><div class='v'>🔻 {downs} 項</div><div class='l'>本月變便宜</div></div>
-              <div class='stat'><div class='v'>➖ {flat} 項</div><div class='l'>大致持平</div></div>
-              <div class='stat'><div class='v'>{ometa['premises']} 家</div><div class='l'>KK 採價店家</div></div>
+              <div class='stat'><div class='v'>🔺 {ups}</div><div class='l'>{ui('本月變貴', 'Pricier this month')}</div></div>
+              <div class='stat'><div class='v'>🔻 {downs}</div><div class='l'>{ui('本月變便宜', 'Cheaper this month')}</div></div>
+              <div class='stat'><div class='v'>➖ {flat}</div><div class='l'>{ui('大致持平', 'Mostly stable')}</div></div>
+              <div class='stat'><div class='v'>{ometa['premises']}</div><div class='l'>{ui('KK 採價店家', 'KK sampled shops')}</div></div>
             </div>""", unsafe_allow_html=True)
-            st.dataframe(otable, use_container_width=True, hide_index=True)
-            st.caption(
+            _otable = otable
+            if st.session_state.get("app_lang") == "en":
+                _otable = otable.rename(columns={
+                    "品項": "Item", "變化": "Change", "單位": "Unit",
+                    f"上月 ({ometa['prev']})": f"Previous ({ometa['prev']})",
+                    f"本月 ({ometa['cur']})": f"Current ({ometa['cur']})",
+                })
+            st.dataframe(_otable, use_container_width=True, hide_index=True)
+            st.caption(ui(
                 f"資料來源：PriceCatcher（馬來西亞 KPDN + DOSM，data.gov.my，CC BY 4.0）｜"
                 f"比較月份 {ometa['prev']} → {ometa['cur']}，取 Kota Kinabalu 店家當月中位價。"
-                f"官方採價以超市與零售店為主，濕市場價格可能略有差異，僅供參考。")
+                f"官方採價以超市與零售店為主，濕市場價格可能略有差異，僅供參考。",
+                f"Source: PriceCatcher (Malaysia KPDN + DOSM, data.gov.my, CC BY 4.0). "
+                f"Comparing {ometa['prev']} → {ometa['cur']}, using monthly median prices from Kota Kinabalu premises. "
+                "Official samples are mainly supermarkets and retailers; wet-market prices may differ.",
+            ))
         else:
-            st.info("官方數據已下載，但本期抓不到亞庇的相關品項，請過幾天再看。")
+            st.info(ui("官方數據已下載，但本期抓不到亞庇的相關品項，請過幾天再看。",
+                       "Official data loaded, but no Kota Kinabalu items were found for this period. Please check again later."))
     except Exception:
-        st.warning("📡 官方月度數據暫時無法載入（來源網站忙碌），請稍後重新整理頁面。"
-                   "下方為麗都市場參考行情。")
+        st.warning(ui(
+            "📡 官方月度數據暫時無法載入（來源網站忙碌），請稍後重新整理頁面。下方為麗都市場參考行情。",
+            "📡 Official monthly data is temporarily unavailable. Please refresh later. The Lido market references are shown below.",
+        ))
 
-    st.markdown("<div class='section-title'>🌏 三地市場對比：亞庇 · 吉隆坡 · 台北</div>",
+    st.markdown(f"<div class='section-title'>{ui('🌏 三地市場對比：亞庇 · 吉隆坡 · 台北', '🌏 Market Comparison: KK · Kuala Lumpur · Taipei')}</div>",
                 unsafe_allow_html=True)
     try:
-        with st.spinner("正在載入三地對比（首次稍久）…"):
+        with st.spinner(ui("正在載入三地對比（首次稍久）…",
+                           "Loading three-city comparison (first load may take a little longer)…")):
             cdf, cmeta = MC.fetch_compare()
         st.dataframe(cdf, use_container_width=True, hide_index=True)
-        st.caption(
+        st.caption(ui(
             f"亞庇／吉隆坡：PriceCatcher 官方零售價（{cmeta['month']}；KK {cmeta['kk_n']} 家、KL {cmeta['kl_n']} 家中位價）。"
             f"台北：台灣農業部農產品批發行情，以即時匯率 1 TWD≈{cmeta['rate']:.3f} RM 換算"
-            "（批發價通常低於零售，僅供跨國參考）。雞肉／雞蛋／海鮮在台灣屬畜漁產、不在此農產批發資料，故台北欄留空。")
+            "（批發價通常低於零售，僅供跨國參考）。雞肉／雞蛋／海鮮在台灣屬畜漁產、不在此農產批發資料，故台北欄留空。",
+            f"KK/KL: PriceCatcher official retail prices ({cmeta['month']}; medians from {cmeta['kk_n']} KK and {cmeta['kl_n']} KL premises). "
+            f"Taipei: Taiwan agricultural wholesale prices converted at 1 TWD≈{cmeta['rate']:.3f} RM. "
+            "Wholesale prices are usually lower than retail; chicken, eggs, and seafood are not included in that Taipei agricultural dataset.",
+        ))
     except Exception as _ce:
-        st.info(f"三地對比資料暫時無法取得（{_ce}）。")
+        st.info(ui(f"三地對比資料暫時無法取得（{_ce}）。",
+                   f"Three-city comparison is temporarily unavailable ({_ce})."))
 
-    st.markdown("<div class='section-title'>🐟 麗都市場海鮮參考行情（RM / 公斤）</div>",
+    st.markdown(f"<div class='section-title'>{ui('🐟 麗都市場海鮮參考行情（RM / 公斤）', '🐟 Lido Market Seafood References (RM / kg)')}</div>",
                 unsafe_allow_html=True)
     _mkt = [("market_tenggiri.jpg", "馬鮫魚 Ikan Tenggiri"),
             ("market_kembung.jpg", "甘望魚 Ikan Kembung"),
@@ -669,18 +776,22 @@ if _active_section == "market":
     sf = pd.DataFrame([{"海鮮": f"{e} {zh}", "馬來名稱": my,
                         "價格 (RM/kg)": f"RM {a} – {b}", "特點 / 料理方式": note}
                        for zh, my, e, a, b, note in SEAFOOD_PRICES])
+    if st.session_state.get("app_lang") == "en":
+        sf = sf.rename(columns={"海鮮": "Seafood", "馬來名稱": "Malay Name",
+                                "價格 (RM/kg)": "Price (RM/kg)", "特點 / 料理方式": "Notes / Cooking"})
     st.dataframe(sf, use_container_width=True, hide_index=True)
-    st.markdown("<div class='card'><b style='color:#2b211a'>🧺 買海鮮小貼士</b><br>" +
+    st.markdown(f"<div class='card'><b style='color:#2b211a'>{ui('🧺 買海鮮小貼士', '🧺 Seafood Buying Tips')}</b><br>" +
                 "<br>".join(MARKET_TIPS[:5]) + "</div>", unsafe_allow_html=True)
 
 
 # ================ 🔍 找菜（YouTube 搜尋 → 卡片 → 內嵌播放 → 排入餐表） ================
 if _active_section == "find":
-    st.markdown("<div class='section-title'>🔍 想煮什麼？YouTube 上找，找到就排進餐表</div>",
+    st.markdown(f"<div class='section-title'>{ui('🔍 想煮什麼？YouTube 上找，找到就排進餐表', '🔍 What do you want to cook? Find it on YouTube, then add it to the plan')}</div>",
                 unsafe_allow_html=True)
 
     if not CLIENTS_OK:
-        st.info("此功能需要 ANTHROPIC / SUPABASE / YOUTUBE 三把金鑰，請先到 Secrets 設定。")
+        st.info(ui("此功能需要 ANTHROPIC / SUPABASE / YOUTUBE 三把金鑰，請先到 Secrets 設定。",
+                   "This feature needs ANTHROPIC / SUPABASE / YOUTUBE keys. Please configure Secrets first."))
     else:
         ss = st.session_state
         ss.setdefault("find_cards", [])
@@ -692,21 +803,23 @@ if _active_section == "find":
         ss.setdefault("cuisine", "全部")
 
         with st.container(border=True):
-            st.markdown("<b style='color:#2b211a'>⚙️ 用餐設定</b>", unsafe_allow_html=True)
+            st.markdown(f"<b style='color:#2b211a'>{ui('⚙️ 用餐設定', '⚙️ Meal Settings')}</b>", unsafe_allow_html=True)
             sc1, sc2 = st.columns([1.4, 1])
             with sc1:
-                ss.people = people_stepper(ss.people, "people")
+                ss.people = people_stepper(ss.people, "people", label=ui("👨‍👩‍👧 用餐人數", "👨‍👩‍👧 People"))
             with sc2:
-                ss.skin = st.toggle("💧 皮膚敏感（標示發物）", value=ss.skin, key="skin_toggle")
+                ss.skin = st.toggle(ui("💧 皮膚敏感（標示發物）", "💧 Sensitive skin (mark triggers)"),
+                                    value=ss.skin, key="skin_toggle")
             try:
-                _cz = st.pills("🍽️ 料理大類", CUISINES, default=ss.cuisine, key="cuisine_pills")
+                _cz = st.pills(ui("🍽️ 料理大類", "🍽️ Cuisine"), CUISINES, default=ss.cuisine,
+                               key="cuisine_pills", format_func=cuisine_label)
                 ss.cuisine = _cz or "全部"
             except Exception:
-                ss.cuisine = st.radio("🍽️ 料理大類", CUISINES,
+                ss.cuisine = st.radio(ui("🍽️ 料理大類", "🍽️ Cuisine"), CUISINES,
                                       index=CUISINES.index(ss.cuisine), horizontal=True,
-                                      key="cuisine_radio")
+                                      key="cuisine_radio", format_func=cuisine_label)
             if ss.skin:
-                st.caption(SKIN_NOTE)
+                st.caption(skin_note())
 
         _f = people_factor(ss.get("people", 4))
         _emojis = ["🍲", "🍛", "🥘", "🍜", "🥗", "🍳", "🐟", "🍗"]
@@ -721,6 +834,13 @@ if _active_section == "find":
             "🌶 辛香料": ["辣椒", "九層塔", "香菜"],
             "🍚 主食": ["白飯", "麵條", "米粉", "河粉"],
         }
+        PANTRY_CAT_EN = {
+            "🥬 蔬菜": "🥬 Vegetables",
+            "🍖 肉‧海鮮": "🍖 Meat & Seafood",
+            "🥚 蛋‧豆製": "🥚 Eggs & Soy",
+            "🌶 辛香料": "🌶 Aromatics",
+            "🍚 主食": "🍚 Staples",
+        }
         _ALL_PRESET = [it for items in PANTRY_CATS.values() for it in items]
 
         # 食材庫只在進頁時載入一次 → 之後點選純記憶體、不再每次連線（快很多）
@@ -728,30 +848,35 @@ if _active_section == "find":
             ss["pan_items"] = [r["item"] for r in MP.get_pantry(supabase)]
 
         with st.container(border=True):
-            st.markdown("<div class='section-title' style='margin-top:0'>🧊 我的食材庫</div>",
+            st.markdown(f"<div class='section-title' style='margin-top:0'>{ui('🧊 我的食材庫', '🧊 My Pantry')}</div>",
                         unsafe_allow_html=True)
             st.markdown(
-                "<div class='pan-guide'>🌸 <b>怎麼用</b>：① 點下面標籤勾出家裡有的食材"
-                "（可一次點多個）→ ② 下方切到 <b>🧊 用現有食材煮</b>"
-                " → ③ 挑一道按 <b>➕ 排入</b> → ④ 到最上面 <b>📅 一週餐表</b> 分頁就能看到囉！</div>",
+                ui(
+                    "<div class='pan-guide'>🌸 <b>怎麼用</b>：① 點下面標籤勾出家裡有的食材"
+                    "（可一次點多個）→ ② 下方切到 <b>🧊 用現有食材煮</b>"
+                    " → ③ 挑一道按 <b>➕ 排入</b> → ④ 到最上面 <b>📅 一週餐表</b> 分頁就能看到囉！</div>",
+                    "<div class='pan-guide'>🌸 <b>How it works</b>: ① Select ingredients you already have "
+                    "→ ② switch to <b>🧊 Cook from Pantry</b> below → ③ pick a dish and tap <b>➕ Add</b> "
+                    "→ ④ open <b>📅 Weekly Plan</b> to see it.</div>",
+                ),
                 unsafe_allow_html=True)
 
             _picked = []
             for _ci, (_cat, _items) in enumerate(PANTRY_CATS.items()):
                 _cur = set(ss["pan_items"])
-                _sel = st.pills(_cat, _items, selection_mode="multi",
+                _sel = st.pills(ui(_cat, PANTRY_CAT_EN.get(_cat, _cat)), _items, selection_mode="multi",
                                 default=[it for it in _items if it in _cur],
                                 key=f"pan_pills_{_ci}")
                 _picked.extend(_sel or [])
 
             _ac1, _ac2 = st.columns([3, 1])
             with _ac1:
-                _new = st.text_input("自己加", key="pan_new",
-                                     placeholder="例：芹菜、鯧魚、年糕…",
+                _new = st.text_input(ui("自己加", "Add custom"), key="pan_new",
+                                     placeholder=ui("例：芹菜、鯧魚、年糕…", "e.g. celery, pomfret, rice cake…"),
                                      label_visibility="collapsed")
             with _ac2:
-                _add = st.button("➕ 加入", key="pan_add_btn", use_container_width=True)
-            _clear = bool(ss["pan_items"]) and st.button("🧹 清空食材庫", key="pan_clear")
+                _add = st.button(ui("➕ 加入", "➕ Add"), key="pan_add_btn", use_container_width=True)
+            _clear = bool(ss["pan_items"]) and st.button(ui("🧹 清空食材庫", "🧹 Clear Pantry"), key="pan_clear")
 
             if _clear:
                 for _ci in range(len(PANTRY_CATS)):
@@ -759,7 +884,7 @@ if _active_section == "find":
                 ss.pop("pan_new", None)
                 MP.clear_pantry(supabase)
                 ss["pan_items"] = []
-                st.toast("食材庫已清空", icon="🧹")
+                st.toast(ui("食材庫已清空", "Pantry cleared"), icon="🧹")
                 st.rerun()
 
             _custom = [it for it in ss["pan_items"] if it not in _ALL_PRESET]
@@ -779,21 +904,33 @@ if _active_section == "find":
                 ss["pan_items"] = _target
             if _did_add:
                 ss.pop("pan_new", None)
-                st.toast(f"已加入 {_new.strip()}", icon="🧺")
+                st.toast(ui(f"已加入 {_new.strip()}", f"Added {_new.strip()}"), icon="🧺")
                 st.rerun()
 
             _pan = ss["pan_items"]
             if _pan:
-                st.markdown("<div class='pan-have'>🧺 目前有 " + str(len(_pan)) + " 樣："
+                st.markdown(ui("<div class='pan-have'>🧺 目前有 " + str(len(_pan)) + " 樣：",
+                               "<div class='pan-have'>🧺 You have " + str(len(_pan)) + " items: ")
                             + "、".join(_pan) + "</div>", unsafe_allow_html=True)
             else:
-                st.caption("還沒勾食材，先點幾個吧 🌸")
-            st.caption("💡 鹽油醬蒜薑蔥等常備調味料一律當作已有，不列入「還缺」。")
+                st.caption(ui("還沒勾食材，先點幾個吧 🌸", "No pantry items yet. Pick a few to start 🌸"))
+            st.caption(ui("💡 鹽油醬蒜薑蔥等常備調味料一律當作已有，不列入「還缺」。",
+                          "💡 Pantry basics such as salt, oil, soy sauce, garlic, ginger, and scallions are treated as already available."))
 
         # ── 推薦模式切換 ─────────────────────────────────────
-        _mode = st.radio("推薦方式", ["🎲 隨機精選", "🧊 用現有食材煮"],
-                         horizontal=True, key="rec_mode", label_visibility="collapsed")
-        st.caption("🎲 隨機精選＝每類給 5 道靈感　·　🧊 用現有食材煮＝依你勾的食材排出最能煮的菜")
+        if ss.get("rec_mode") not in ("random", "pantry"):
+            ss["rec_mode"] = "random"
+        _mode = st.radio(
+            ui("推薦方式", "Recommendation mode"),
+            ["random", "pantry"],
+            horizontal=True,
+            key="rec_mode",
+            label_visibility="collapsed",
+            format_func=lambda x: ui("🎲 隨機精選", "🎲 Random Picks") if x == "random"
+            else ui("🧊 用現有食材煮", "🧊 Cook from Pantry"),
+        )
+        st.caption(ui("🎲 隨機精選＝每類給 5 道靈感　·　🧊 用現有食材煮＝依你勾的食材排出最能煮的菜",
+                      "🎲 Random Picks gives 5 ideas per cuisine · 🧊 Cook from Pantry ranks dishes by the ingredients you selected"))
 
         def _play_recipe_video(cz, dish_name):
             """在本頁播放器播放推薦菜色的第一支 YouTube 做法。"""
@@ -822,7 +959,7 @@ if _active_section == "find":
                 ss.scroll_to_find_player = True
                 return True
             except Exception as exc:
-                st.error(f"影片載入失敗：{exc}")
+                st.error(ui(f"影片載入失敗：{exc}", f"Video load failed: {exc}"))
                 return True
 
         def _render_rec_row(cz, dishes):
@@ -834,37 +971,44 @@ if _active_section == "find":
                         st.markdown(
                             f"<div class='rec-emoji'>{_emojis[_i % len(_emojis)]}</div>"
                             f"<div class='rec-name'>{_name}{_fl}</div>"
-                            f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
+                            f"<span class='cost-badge'>💰 {ui('估', 'est.')} RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
                             unsafe_allow_html=True)
-                        if st.button("▶ 看做法", key=f"rec_play_{cz}_{_i}",
+                        if st.button(ui("▶ 看做法", "▶ Watch Recipe"), key=f"rec_play_{cz}_{_i}",
                                      use_container_width=True):
-                            with st.spinner(f"正在找「{_name}」的 YouTube 做法…"):
+                            with st.spinner(ui(f"正在找「{_name}」的 YouTube 做法…",
+                                               f"Finding a YouTube recipe for {_name}…")):
                                 if not _play_recipe_video(cz, _name):
-                                    st.error("找不到對應影片，換一道試試。")
-                        _pop = st.popover("➕ 排入", use_container_width=True)
+                                    st.error(ui("找不到對應影片，換一道試試。",
+                                                "No matching video found. Try another dish."))
+                        _pop = st.popover(ui("➕ 排入", "➕ Add"), use_container_width=True)
                         with _pop:
-                            _d = st.date_input("排到哪一天", value=date.today(), key=f"rd_{cz}_{_i}")
-                            _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"rs_{cz}_{_i}")
-                            if st.button("✅ 確認排入", key=f"rcf_{cz}_{_i}", use_container_width=True):
-                                with st.spinner(f"從 YouTube 找「{_name}」並抽食材…"):
+                            _d = st.date_input(ui("排到哪一天", "Plan date"), value=date.today(), key=f"rd_{cz}_{_i}")
+                            _sl = st.radio(ui("時段", "Meal"), MP.SLOTS, horizontal=True,
+                                           key=f"rs_{cz}_{_i}", format_func=slot_label)
+                            if st.button(ui("✅ 確認排入", "✅ Confirm"), key=f"rcf_{cz}_{_i}", use_container_width=True):
+                                with st.spinner(ui(f"從 YouTube 找「{_name}」並抽食材…",
+                                                   f"Finding {_name} on YouTube and extracting ingredients…")):
                                     try:
                                         _rec = R.get_or_build_by_name(
                                             _name, yt_api_key=YT_KEY, anthropic_client=claude,
                                             supabase=supabase, search_prefix=CUISINE_KW.get(cz, ""))
                                         if _rec:
                                             MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
-                                            st.success(f"已排入 {_d} {_sl}：{_rec['title'][:16]}　👉 到「📅 一週餐表」看")
-                                            st.toast("已排入！", icon="✅")
+                                            st.success(ui(f"已排入 {_d} {slot_label(_sl)}：{_rec['title'][:16]}　👉 到「📅 一週餐表」看",
+                                                          f"Added to {_d} {slot_label(_sl)}: {_rec['title'][:16]} 👉 Open Weekly Plan"))
+                                            st.toast(ui("已排入！", "Added!"), icon="✅")
                                         else:
-                                            st.error("找不到對應影片，換一道試試。")
+                                            st.error(ui("找不到對應影片，換一道試試。",
+                                                        "No matching video found. Try another dish."))
                                     except Exception as _e:
-                                        st.error(f"排入失敗：{_e}")
+                                        st.error(ui(f"排入失敗：{_e}", f"Could not add: {_e}"))
 
-        if _mode.startswith("🧊"):
+        if _mode == "pantry":
             if not _pan:
-                st.info("先在上面「🧊 我的食材庫」加一些食材，這裡就會推薦你能煮的菜 🌸")
+                st.info(ui("先在上面「🧊 我的食材庫」加一些食材，這裡就會推薦你能煮的菜 🌸",
+                           "Add a few ingredients in My Pantry above, then this area will recommend dishes you can cook 🌸"))
             else:
-                _only = st.checkbox("只看缺 ≤ 1 樣", key="pan_only_close")
+                _only = st.checkbox(ui("只看缺 ≤ 1 樣", "Only show dishes missing ≤ 1 item"), key="pan_only_close")
                 if "pan_index" not in ss:
                     ss["pan_index"] = R.load_pantry_index(
                         supabase, [n for (n, _l, _h) in CUISINE_DISHES["全部"]])
@@ -872,10 +1016,11 @@ if _active_section == "find":
                 if _only:
                     _recs = [r for r in _recs if (r["total"] - r["have"]) <= 1]
                 st.markdown(
-                    f"<div class='section-title'>🍳 用現有食材能煮（{len(_recs)} 道 · 吻合度排序）</div>",
+                    f"<div class='section-title'>{ui(f'🍳 用現有食材能煮（{len(_recs)} 道 · 吻合度排序）', f'🍳 Cook from Pantry ({len(_recs)} dishes · ranked by match)')}</div>",
                     unsafe_allow_html=True)
                 if not _recs:
-                    st.warning("目前快取裡沒有吻合的菜。多加幾樣常見食材，或先用「🎲 隨機精選」把菜建進快取。")
+                    st.warning(ui("目前快取裡沒有吻合的菜。多加幾樣常見食材，或先用「🎲 隨機精選」把菜建進快取。",
+                                  "No matching cached dishes yet. Add more common ingredients, or use Random Picks first to build the cache."))
                 _pcols = st.columns(4)
                 for _i, _r in enumerate(_recs):
                     _nm = _r["name"]
@@ -886,49 +1031,55 @@ if _active_section == "find":
                         with st.container(border=True):
                             _fl = " ⚠" if (ss.get("skin") and name_has_trigger(_nm)) else ""
                             _badge = ("<span class='pan-ok'>✅ 有 %d/%d 食材%s</span>"
-                                      % (_r["have"], _r["total"], " 🎉" if _full else ""))
+                                      % (_r["have"], _r["total"], " 🎉" if _full else "")) if st.session_state.get("app_lang") != "en" else (
+                                          "<span class='pan-ok'>✅ Have %d/%d ingredients%s</span>"
+                                          % (_r["have"], _r["total"], " 🎉" if _full else ""))
                             if _miss:
-                                _need = ("<div class='pan-miss'>🛒 還缺："
+                                _need = (f"<div class='pan-miss'>🛒 {ui('還缺：', 'Missing: ')}"
                                          + "、".join(_miss[:4])
                                          + ("…" if len(_miss) > 4 else "") + "</div>")
                             else:
-                                _need = "<div class='pan-miss pan-miss-ok'>全部都有！</div>"
+                                _need = f"<div class='pan-miss pan-miss-ok'>{ui('全部都有！', 'You have everything!')}</div>"
                             st.markdown(
                                 f"<div class='rec-name'>{_nm}{_fl}</div>"
                                 f"{_badge}{_need}"
-                                f"<span class='cost-badge'>💰 估 RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
+                                f"<span class='cost-badge'>💰 {ui('估', 'est.')} RM {int(round(_lo * _f))}–{int(round(_hi * _f))}</span>",
                                 unsafe_allow_html=True)
-                            with st.popover("➕ 排入", use_container_width=True):
-                                _d = st.date_input("排到哪一天", value=date.today(), key=f"pd_{_i}")
-                                _sl = st.radio("時段", MP.SLOTS, horizontal=True, key=f"ps_{_i}")
-                                if st.button("✅ 確認排入", key=f"pcf_{_i}", use_container_width=True):
-                                    with st.spinner(f"排入「{_nm}」…"):
+                            with st.popover(ui("➕ 排入", "➕ Add"), use_container_width=True):
+                                _d = st.date_input(ui("排到哪一天", "Plan date"), value=date.today(), key=f"pd_{_i}")
+                                _sl = st.radio(ui("時段", "Meal"), MP.SLOTS, horizontal=True,
+                                               key=f"ps_{_i}", format_func=slot_label)
+                                if st.button(ui("✅ 確認排入", "✅ Confirm"), key=f"pcf_{_i}", use_container_width=True):
+                                    with st.spinner(ui(f"排入「{_nm}」…", f"Adding {_nm}…")):
                                         try:
                                             _rec = R.get_or_build_by_name(
                                                 _nm, yt_api_key=YT_KEY, anthropic_client=claude,
                                                 supabase=supabase)
                                             if _rec:
                                                 MP.add_to_plan(supabase, _d, _sl, _rec["video_id"])
-                                                st.success(f"已排入 {_d} {_sl}：{_nm}　👉 到上面「📅 一週餐表」分頁看")
-                                                st.toast(f"{_nm} 已排入！", icon="✅")
+                                                st.success(ui(f"已排入 {_d} {slot_label(_sl)}：{_nm}　👉 到上面「📅 一週餐表」分頁看",
+                                                              f"Added to {_d} {slot_label(_sl)}: {_nm} 👉 Open Weekly Plan"))
+                                                st.toast(ui(f"{_nm} 已排入！", f"{_nm} added!"), icon="✅")
                                             else:
-                                                st.error("找不到影片，換一道試試。")
+                                                st.error(ui("找不到影片，換一道試試。", "No video found. Try another dish."))
                                         except Exception as _e:
-                                            st.error(f"排入失敗：{_e}")
+                                            st.error(ui(f"排入失敗：{_e}", f"Could not add: {_e}"))
         else:
             rc1, rc2 = st.columns([3, 1])
             with rc1:
-                _hdr = ("🍴 為你精選（每大類各 5 道，可直接排入）"
-                        if _cz == "全部" else f"🍴 為你精選 5 道【{_cz}】")
+                _hdr = (ui("🍴 為你精選（每大類各 5 道，可直接排入）",
+                           "🍴 Picks for You (5 per cuisine, ready to add)")
+                        if _cz == "全部" else ui(f"🍴 為你精選 5 道【{_cz}】",
+                                                f"🍴 5 Picks for {cuisine_label(_cz)}"))
                 st.markdown(f"<div class='section-title'>{_hdr}</div>", unsafe_allow_html=True)
             with rc2:
-                _regen = st.button("🔄 換一批", key="regen_recs", use_container_width=True)
+                _regen = st.button(ui("🔄 換一批", "🔄 Refresh"), key="regen_recs", use_container_width=True)
             if _cz == "全部":
                 for _bcz in ["中式", "台式", "西式", "泰式", "馬來西亞", "印尼"]:
                     _rk = f"recs_{_bcz}"
                     if _regen or _rk not in ss:
                         ss[_rk] = random.sample(CUISINE_DISHES[_bcz], 5)
-                    st.markdown(f"<div class='rec-cat'>🍽️ {_bcz}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='rec-cat'>🍽️ {cuisine_label(_bcz)}</div>", unsafe_allow_html=True)
                     _render_rec_row(_bcz, ss[_rk])
             else:
                 _rk = f"recs_{_cz}"
@@ -938,21 +1089,23 @@ if _active_section == "find":
                 _render_rec_row(_cz, ss[_rk])
 
 
-        st.markdown("<div class='section-title'>🔎 或自己搜尋</div>", unsafe_allow_html=True)
-        query = st.text_input("輸入菜名", placeholder="例：麻婆豆腐、咖哩雞、番茄炒蛋")
-        if st.button("🔍 搜尋", key="find_search", type="primary"):
+        st.markdown(f"<div class='section-title'>{ui('🔎 或自己搜尋', '🔎 Or Search Yourself')}</div>", unsafe_allow_html=True)
+        query = st.text_input(ui("輸入菜名", "Enter a dish name"),
+                              placeholder=ui("例：麻婆豆腐、咖哩雞、番茄炒蛋",
+                                             "e.g. mapo tofu, curry chicken, tomato egg"))
+        if st.button(ui("🔍 搜尋", "🔍 Search"), key="find_search", type="primary"):
             if query.strip():
                 kw = CUISINE_KW.get(ss.cuisine, "")
                 full_q = (kw + " " + query.strip()).strip()
-                with st.spinner("搜尋中…"):
+                with st.spinner(ui("搜尋中…", "Searching…")):
                     try:
                         ss.find_cards = R.search_dishes(full_q, YT_KEY)
                         ss.play_vid = None
                     except Exception as e:
-                        st.error(f"搜尋失敗：{e}")
+                        st.error(ui(f"搜尋失敗：{e}", f"Search failed: {e}"))
                         ss.find_cards = []
             else:
-                st.warning("先輸入菜名再搜尋喔 🌸")
+                st.warning(ui("先輸入菜名再搜尋喔 🌸", "Enter a dish name first 🌸"))
 
         if ss.find_cards:
             cols = st.columns(3)
@@ -973,19 +1126,19 @@ if _active_section == "find":
                             f"<div class='yt-card-title'>{card['title']}{skin_flag}</div>"
                             f"<div class='yt-card-chan'>📺 {card['channel']}</div>",
                             unsafe_allow_html=True)
-                        if st.button("▶️ 播放", key=f"play_{card['video_id']}",
+                        if st.button(ui("▶️ 播放", "▶️ Play"), key=f"play_{card['video_id']}",
                                      use_container_width=True):
                             ss.play_vid = card["video_id"]
                             ss.play_title = card["title"]
                             ss.scroll_to_find_player = True
-                        with st.popover("➕ 排入餐表", use_container_width=True):
-                            d = st.date_input("排到哪一天", value=date.today(),
+                        with st.popover(ui("➕ 排入餐表", "➕ Add to Plan"), use_container_width=True):
+                            d = st.date_input(ui("排到哪一天", "Plan date"), value=date.today(),
                                               key=f"d_{card['video_id']}")
-                            sl = st.radio("時段", MP.SLOTS, horizontal=True,
-                                          key=f"sl_{card['video_id']}")
-                            if st.button("✅ 確認排入", key=f"cf_{card['video_id']}",
+                            sl = st.radio(ui("時段", "Meal"), MP.SLOTS, horizontal=True,
+                                          key=f"sl_{card['video_id']}", format_func=slot_label)
+                            if st.button(ui("✅ 確認排入", "✅ Confirm"), key=f"cf_{card['video_id']}",
                                          use_container_width=True):
-                                with st.spinner("抽取食材中…"):
+                                with st.spinner(ui("抽取食材中…", "Extracting ingredients…")):
                                     try:
                                         rec = R.get_or_build_recipe(
                                             card, yt_api_key=YT_KEY,
@@ -993,23 +1146,24 @@ if _active_section == "find":
                                         MP.add_to_plan(supabase, d, sl, card["video_id"])
                                         warn = ""
                                         if ss.skin and ingredients_have_trigger(rec.get("ingredients")):
-                                            warn = "（⚠ 含發物）"
-                                        st.success(f"已排入 {d} {sl}：{rec['title'][:16]}{warn}")
+                                            warn = ui("（⚠ 含發物）", " (⚠ trigger ingredients)")
+                                        st.success(ui(f"已排入 {d} {slot_label(sl)}：{rec['title'][:16]}{warn}",
+                                                      f"Added to {d} {slot_label(sl)}: {rec['title'][:16]}{warn}"))
                                     except Exception as e:
-                                        st.error(f"排入失敗：{e}")
+                                        st.error(ui(f"排入失敗：{e}", f"Could not add: {e}"))
 
         st.markdown("<div id='find-player'></div>", unsafe_allow_html=True)
         if ss.play_vid:
             pc1, pc2 = st.columns([3, 1])
             with pc1:
-                st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title[:44]}</div>",
+                st.markdown(f"<div class='section-title'>{ui('▶️ 正在播放：', '▶️ Now Playing: ')}{ss.play_title[:44]}</div>",
                             unsafe_allow_html=True)
             with pc2:
-                if st.button("✕ 關閉影片", key="close_find_player", use_container_width=True):
+                if st.button(ui("✕ 關閉影片", "✕ Close Video"), key="close_find_player", use_container_width=True):
                     ss.play_vid = None
                     st.rerun()
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid}")
-            st.caption("點播放器右下角可全螢幕。")
+            st.caption(ui("點播放器右下角可全螢幕。", "Use the player controls for fullscreen."))
             if ss.get("scroll_to_find_player"):
                 components.html(
                     "<script>try{var d=window.parent.document;"
@@ -1019,10 +1173,10 @@ if _active_section == "find":
                 ss.scroll_to_find_player = False
 
 if _active_section == "week":
-    st.markdown("<div class='section-title'>📅 一週餐表</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='section-title'>{ui('📅 一週餐表', '📅 Weekly Meal Plan')}</div>", unsafe_allow_html=True)
 
     if not CLIENTS_OK:
-        st.info("此功能需要 Secrets 設定。")
+        st.info(ui("此功能需要 Secrets 設定。", "This feature needs Secrets configured."))
     else:
         ss = st.session_state
         ss.setdefault("week_anchor", date.today())
@@ -1039,66 +1193,75 @@ if _active_section == "week":
             visual = (f"<img class='yt-thumb' src='{thumb}'/>" if thumb else "")
             flag = " <span class='warn-flag'>⚠</span>" if dish.get("inferred") else ""
             if ss.get("skin") and ingredients_have_trigger(dish.get("ingredients")):
-                flag += " <span class='warn-flag'>⚠發物</span>"
+                flag += f" <span class='warn-flag'>{ui('⚠發物', '⚠ trigger')}</span>"
             st.markdown(
                 f"<div class='day-card'>{visual}"
                 f"<div class='dish-mini'>{dish['title'][:40]}{flag}</div>"
                 f"{scaled_cost_badge(dish.get('ingredients'), ss.get('people', 4))}</div>",
                 unsafe_allow_html=True)
-            if st.button("▶️ 播放", key=f"playw_{day}_{slot}_{vid}", use_container_width=True):
+            if st.button(ui("▶️ 播放", "▶️ Play"), key=f"playw_{day}_{slot}_{vid}", use_container_width=True):
                 ss.play_vid_week = vid
                 ss.play_title_week = dish["title"]
                 ss.scroll_to_player = True
-                st.toast("▶️ 影片已在下方開始播放")
-            with st.expander("🥬 食材"):
+                st.toast(ui("▶️ 影片已在下方開始播放", "▶️ Video is playing below"))
+            with st.expander(ui("🥬 食材", "🥬 Ingredients")):
                 if dish.get("inferred"):
-                    st.caption("⚠ 由菜名推測，非影片實際食材，請核對")
+                    st.caption(ui("⚠ 由菜名推測，非影片實際食材，請核對",
+                                  "⚠ Inferred from the dish name, not the actual video ingredients. Please check."))
                 _ings = dish.get("ingredients") or []
                 if _ings:
                     for _ing in _ings:
                         _q = _ing.get("qty")
                         _u = _ing.get("unit") or ""
-                        _amt = "適量" if (_ing.get("is_fuzzy") or _q is None) else f"{_q:g} {_u}".strip()
+                        _amt = ui("適量", "to taste") if (_ing.get("is_fuzzy") or _q is None) else f"{_q:g} {_u}".strip()
                         st.markdown(f"- {_ing.get('name', '')} {_amt}")
                 else:
-                    st.caption("這支影片的描述沒有附食材清單。")
-            if st.button("✕ 移除", key=f"rm_{day}_{slot}_{vid}", use_container_width=True):
+                    st.caption(ui("這支影片的描述沒有附食材清單。",
+                                  "This video description does not include an ingredient list."))
+            if st.button(ui("✕ 移除", "✕ Remove"), key=f"rm_{day}_{slot}_{vid}", use_container_width=True):
                 MP.remove_from_plan(supabase, day, slot, vid)
                 st.rerun()
 
         with st.container(border=True):
-            st.markdown("<b style='color:#2b211a'>🪄 一鍵生成：依你選的料理大類搜 YouTube 填滿餐表</b>",
+            st.markdown(f"<b style='color:#2b211a'>{ui('🪄 一鍵生成：依你選的料理大類搜 YouTube 填滿餐表', '🪄 Auto-generate: fill the plan from YouTube based on your cuisine choice')}</b>",
                         unsafe_allow_html=True)
             gcz1, gcz2 = st.columns([1.6, 1])
             with gcz1:
                 try:
-                    gen_cuisine = st.pills("🍽️ 料理大類", CUISINES,
-                                           default=ss.get("cuisine", "全部"), key="gen_cuisine") or "全部"
+                    gen_cuisine = st.pills(ui("🍽️ 料理大類", "🍽️ Cuisine"), CUISINES,
+                                           default=ss.get("cuisine", "全部"), key="gen_cuisine",
+                                           format_func=cuisine_label) or "全部"
                 except Exception:
-                    gen_cuisine = st.selectbox("🍽️ 料理大類", CUISINES,
+                    gen_cuisine = st.selectbox(ui("🍽️ 料理大類", "🍽️ Cuisine"), CUISINES,
                                                index=CUISINES.index(ss.get("cuisine", "全部")),
-                                               key="gen_cuisine_sb")
+                                               key="gen_cuisine_sb", format_func=cuisine_label)
             with gcz2:
-                gen_skin = st.toggle("💧 皮膚敏感（避開發物）", value=ss.get("skin", False), key="gen_skin")
+                gen_skin = st.toggle(ui("💧 皮膚敏感（避開發物）", "💧 Sensitive skin (avoid triggers)"),
+                                     value=ss.get("skin", False), key="gen_skin")
             if gen_skin:
-                st.caption(SKIN_NOTE)
+                st.caption(skin_note())
             g1, g2 = st.columns([1, 1])
             with g1:
-                gen_days = st.slider("要排幾天", 1, 7, 3, key="gen_days")
+                gen_days = st.slider(ui("要排幾天", "How many days"), 1, 7, 3, key="gen_days")
             with g2:
-                gen_slots = st.multiselect("時段", MP.SLOTS, default=MP.SLOTS, key="gen_slots")
-            st.caption(f"預估耗用 YouTube 額度約 {gen_days * max(1, len(gen_slots)) * 100} units"
-                       f"（每道菜 100u，已抽取過的會走快取）。")
+                gen_slots = st.multiselect(ui("時段", "Meals"), MP.SLOTS, default=MP.SLOTS,
+                                           key="gen_slots", format_func=slot_label)
+            st.caption(ui(
+                f"預估耗用 YouTube 額度約 {gen_days * max(1, len(gen_slots)) * 100} units"
+                f"（每道菜 100u，已抽取過的會走快取）。",
+                f"Estimated YouTube quota: about {gen_days * max(1, len(gen_slots)) * 100} units "
+                "(100 units per dish; cached dishes reuse existing data).",
+            ))
             gb1, gb2 = st.columns([1.4, 1])
             with gb1:
-                go = st.button("🪄 一鍵生成本週餐表", key="gen_week", type="primary",
+                go = st.button(ui("🪄 一鍵生成本週餐表", "🪄 Generate Weekly Plan"), key="gen_week", type="primary",
                                use_container_width=True)
             with gb2:
-                if st.button("🗑️ 清空本週", key="clear_week", use_container_width=True):
+                if st.button(ui("🗑️ 清空本週", "🗑️ Clear Week"), key="clear_week", use_container_width=True):
                     ss._confirm_clear = True
             if go:
                 if not gen_slots:
-                    st.warning("至少選一個時段。")
+                    st.warning(ui("至少選一個時段。", "Choose at least one meal."))
                 else:
                     pool = CUISINE_POOLS.get(gen_cuisine, CUISINE_POOLS["全部"])
                     mon = MP.week_start(ss.week_anchor)
@@ -1109,8 +1272,12 @@ if _active_section == "week":
                     random.shuffle(cand)
                     jobs = [(d, s2) for d in range(gen_days) for s2 in gen_slots]
                     if len(cand) < len(jobs):
-                        st.info(f"「{gen_cuisine}」可用菜色約 {len(cand)} 道，少於要排的 {len(jobs)} 格；"
-                                f"為避免重複，部分格子可能留空。可改選「全部」或減少天數／時段。")
+                        st.info(ui(
+                            f"「{gen_cuisine}」可用菜色約 {len(cand)} 道，少於要排的 {len(jobs)} 格；"
+                            f"為避免重複，部分格子可能留空。可改選「全部」或減少天數／時段。",
+                            f"{cuisine_label(gen_cuisine)} has about {len(cand)} available dishes, fewer than {len(jobs)} slots. "
+                            "Some slots may stay empty to avoid duplicates. Try All, fewer days, or fewer meals.",
+                        ))
                     # 本週已排的影片一併避開，避免和現有的重複
                     try:
                         _ex = MP.get_plan(supabase, mon, mon + timedelta(days=6))
@@ -1119,7 +1286,7 @@ if _active_section == "week":
                         used_vids = set()
                     used_names = set()
                     ci = 0
-                    prog = st.progress(0.0, text="開始生成…")
+                    prog = st.progress(0.0, text=ui("開始生成…", "Starting…"))
                     done = 0
                     fails = []
                     added = 0
@@ -1139,19 +1306,19 @@ if _active_section == "week":
                             name = cand[0] if cand else "家常菜"
                             ci = 1
                         used_names.add(name)
-                        prog.progress(done / len(jobs), text=f"搜尋：{name}")
+                        prog.progress(done / len(jobs), text=ui(f"搜尋：{name}", f"Searching: {name}"))
                         try:
                             rec = R.get_or_build_by_name(
                                 name, yt_api_key=YT_KEY, anthropic_client=claude,
                                 supabase=supabase, throttle=1.2)
                             if not rec:
-                                fails.append(f"{name}：找不到對應影片")
+                                fails.append(ui(f"{name}：找不到對應影片", f"{name}: no matching video"))
                             else:
                                 vid = rec["video_id"]
                                 if vid in used_vids:
-                                    fails.append(f"{name}：與已排重複，略過")
+                                    fails.append(ui(f"{name}：與已排重複，略過", f"{name}: duplicate, skipped"))
                                 elif gen_skin and ingredients_have_trigger(rec.get("ingredients")):
-                                    fails.append(f"{name}：含發物已略過")
+                                    fails.append(ui(f"{name}：含發物已略過", f"{name}: trigger ingredients, skipped"))
                                 else:
                                     MP.add_to_plan(supabase, day, slot, vid)
                                     used_vids.add(vid)
@@ -1159,27 +1326,34 @@ if _active_section == "week":
                         except Exception as e:
                             fails.append(f"{name}：{e}")
                         done += 1
-                    prog.progress(1.0, text="完成！")
+                    prog.progress(1.0, text=ui("完成！", "Done!"))
                     if added:
-                        st.success(f"已加入 {added} 道，往下看餐表 👇")
+                        st.success(ui(f"已加入 {added} 道，往下看餐表 👇",
+                                      f"Added {added} dishes. See the plan below 👇"))
                         st.balloons()
                     if fails:
-                        st.warning("有 {} 道沒加成功（顯示前 5 個）：\n\n{}".format(len(fails), "\n".join(fails[:5])))
+                        st.warning(ui("有 {} 道沒加成功（顯示前 5 個）：\n\n{}",
+                                      "{} dishes could not be added (first 5 shown):\n\n{}").format(len(fails), "\n".join(fails[:5])))
 
-        with st.expander("🔧 進階：預建菜色快取（一次性，解 429）"):
-            st.caption("把所有內建菜色的搜尋結果一次存進快取；跑完後一鍵生成就走快取、"
-                       "不再打 YouTube、也不會再 429。約 50 道、需 1–2 分鐘，已在快取的會自動跳過。")
-            if st.button("開始預建快取", key="warm_cache"):
+        with st.expander(ui("🔧 進階：預建菜色快取（一次性，解 429）", "🔧 Advanced: Prebuild Dish Cache")):
+            st.caption(ui(
+                "把所有內建菜色的搜尋結果一次存進快取；跑完後一鍵生成就走快取、"
+                "不再打 YouTube、也不會再 429。約 50 道、需 1–2 分鐘，已在快取的會自動跳過。",
+                "Save search results for all built-in dishes at once. After this, auto-generate can use the cache, "
+                "reducing YouTube calls and 429 errors. About 50 dishes; already-cached ones are skipped.",
+            ))
+            if st.button(ui("開始預建快取", "Start Cache Build"), key="warm_cache"):
                 alln = sorted({n for lst in CUISINE_DISHES.values() for (n, _l, _h) in lst})
                 todo = [n for n in alln if not R.get_cached_video_id(supabase, n)]
                 if not todo:
-                    st.success("全部菜色都已在快取中，無需預建 🎉")
+                    st.success(ui("全部菜色都已在快取中，無需預建 🎉", "All dishes are already cached 🎉"))
                 else:
-                    pw = st.progress(0.0, text="預建中…")
+                    pw = st.progress(0.0, text=ui("預建中…", "Building cache…"))
                     ok = 0
                     bad = []
                     for wi, wn in enumerate(todo):
-                        pw.progress(wi / len(todo), text=f"預建：{wn}（{wi + 1}/{len(todo)}）")
+                        pw.progress(wi / len(todo), text=ui(f"預建：{wn}（{wi + 1}/{len(todo)}）",
+                                                            f"Caching: {wn} ({wi + 1}/{len(todo)})"))
                         try:
                             wr = R.get_or_build_by_name(wn, yt_api_key=YT_KEY,
                                                         anthropic_client=claude,
@@ -1190,59 +1364,69 @@ if _active_section == "week":
                                 bad.append(wn)
                         except Exception as we:
                             bad.append(f"{wn}：{str(we)[:40]}")
-                    pw.progress(1.0, text="完成")
-                    st.success(f"已預建 {ok} 道進快取。")
+                    pw.progress(1.0, text=ui("完成", "Done"))
+                    st.success(ui(f"已預建 {ok} 道進快取。", f"Cached {ok} dishes."))
                     if bad:
-                        st.warning("有 {} 道仍失敗（多半是 429，稍等片刻再按一次即可，"
-                                   "已成功的會跳過）：\n\n{}".format(len(bad), "\n".join(str(b) for b in bad[:10])))
+                        st.warning(ui(
+                            "有 {} 道仍失敗（多半是 429，稍等片刻再按一次即可，已成功的會跳過）：\n\n{}",
+                            "{} dishes still failed, often due to 429. Wait a bit and run again; successful ones are skipped:\n\n{}",
+                        ).format(len(bad), "\n".join(str(b) for b in bad[:10])))
 
         if ss.get("_confirm_clear"):
-            st.warning("確定要清空本週所有已排的菜嗎？此動作無法復原。")
+            st.warning(ui("確定要清空本週所有已排的菜嗎？此動作無法復原。",
+                          "Clear all dishes planned for this week? This cannot be undone."))
             cc1, cc2 = st.columns(2)
-            if cc1.button("✅ 確定清空", key="clear_yes", type="primary", use_container_width=True):
+            if cc1.button(ui("✅ 確定清空", "✅ Clear"), key="clear_yes", type="primary", use_container_width=True):
                 MP.clear_week(supabase, ss.week_anchor)
                 ss._confirm_clear = False
                 ss.play_vid_week = None
                 st.rerun()
-            if cc2.button("取消", key="clear_no", use_container_width=True):
+            if cc2.button(ui("取消", "Cancel"), key="clear_no", use_container_width=True):
                 ss._confirm_clear = False
                 st.rerun()
 
         nav1, nav2, nav3 = st.columns([1, 2, 1])
         with nav1:
-            if st.button("← 上一週", use_container_width=True):
+            if st.button(ui("← 上一週", "← Previous Week"), use_container_width=True):
                 ss.week_anchor -= timedelta(days=7)
         with nav3:
-            if st.button("下一週 →", use_container_width=True):
+            if st.button(ui("下一週 →", "Next Week →"), use_container_width=True):
                 ss.week_anchor += timedelta(days=7)
         mon = MP.week_start(ss.week_anchor)
         with nav2:
             st.markdown(f"<div style='text-align:center;font-weight:900;color:#2b211a'>"
                         f"{mon} ～ {mon + timedelta(days=6)}</div>", unsafe_allow_html=True)
 
-        week_names = ["一", "二", "三", "四", "五", "六", "日"]
-        view = st.radio("檢視方式", ["📆 單日", "🗓️ 整週"], horizontal=True, key="week_view")
+        if ss.get("week_view") not in ("day", "week"):
+            ss["week_view"] = "day"
+        view = st.radio(
+            ui("檢視方式", "View"),
+            ["day", "week"],
+            horizontal=True,
+            key="week_view",
+            format_func=lambda x: ui("📆 單日", "📆 Single Day") if x == "day" else ui("🗓️ 整週", "🗓️ Full Week"),
+        )
 
         grid = {}
         try:
             grid = MP.get_week_plan(supabase, ss.week_anchor)
-            if view == "📆 單日":
-                day_labels = [f"週{week_names[i]}" for i in range(7)]
+            if view == "day":
+                day_labels = [weekday_short(i) for i in range(7)]
                 default_i = (date.today() - mon).days
                 default_i = default_i if 0 <= default_i <= 6 else 0
-                sel = st.radio("選一天", day_labels, index=default_i, horizontal=True,
+                sel = st.radio(ui("選一天", "Choose a day"), day_labels, index=default_i, horizontal=True,
                                key="day_sel", label_visibility="collapsed")
                 di = day_labels.index(sel)
                 day = mon + timedelta(days=di)
-                st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[di]} 週{week_names[di]}</span>"
+                st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[di]} {weekday_short(di)}</span>"
                             f"<span class='day-cost'>{day.month}/{day.day}</span></div>",
                             unsafe_allow_html=True)
                 for slot in MP.SLOTS:
-                    st.markdown(f"<div class='slot-label'>{'🍱 午餐' if slot == '午' else '🌙 晚餐'}</div>",
+                    st.markdown(f"<div class='slot-label'>{slot_heading(slot)}</div>",
                                 unsafe_allow_html=True)
                     dishes = grid.get((str(day), slot), [])
                     if not dishes:
-                        st.markdown("<div class='dish-mini' style='color:#b39a6e'>· 未排</div>",
+                        st.markdown(f"<div class='dish-mini' style='color:#b39a6e'>· {ui('未排', 'Open')}</div>",
                                     unsafe_allow_html=True)
                     for dish in dishes:
                         render_dish(dish, day, slot)
@@ -1251,35 +1435,35 @@ if _active_section == "week":
                 for d in range(7):
                     day = mon + timedelta(days=d)
                     with day_cols[d]:
-                        st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[d]} 週{week_names[d]}</span>"
+                        st.markdown(f"<div class='day-head'><span>{DAY_EMOJIS[d]} {weekday_short(d)}</span>"
                                     f"<span class='day-cost'>{day.month}/{day.day}</span></div>",
                                     unsafe_allow_html=True)
                         for slot in MP.SLOTS:
-                            st.markdown(f"<div class='slot-label'>{'🍱 午餐' if slot == '午' else '🌙 晚餐'}</div>",
+                            st.markdown(f"<div class='slot-label'>{slot_heading(slot)}</div>",
                                         unsafe_allow_html=True)
                             dishes = grid.get((str(day), slot), [])
                             if not dishes:
-                                st.markdown("<div class='dish-mini' style='color:#b39a6e'>· 未排</div>",
+                                st.markdown(f"<div class='dish-mini' style='color:#b39a6e'>· {ui('未排', 'Open')}</div>",
                                             unsafe_allow_html=True)
                             for dish in dishes:
                                 render_dish(dish, day, slot)
         except Exception as e:
-            st.error(f"餐表載入錯誤：{e}")
+            st.error(ui(f"餐表載入錯誤：{e}", f"Meal plan load error: {e}"))
         st.session_state["_grid_cache"] = grid
 
         st.markdown("<div id='player-anchor'></div>", unsafe_allow_html=True)
         if ss.get("play_vid_week"):
             pc1, pc2 = st.columns([3, 1])
             with pc1:
-                st.markdown(f"<div class='section-title'>▶️ 正在播放：{ss.play_title_week[:44]}</div>",
+                st.markdown(f"<div class='section-title'>{ui('▶️ 正在播放：', '▶️ Now Playing: ')}{ss.play_title_week[:44]}</div>",
                             unsafe_allow_html=True)
             with pc2:
-                if st.button("✕ 關閉影片", key="close_week_player", use_container_width=True):
+                if st.button(ui("✕ 關閉影片", "✕ Close Video"), key="close_week_player", use_container_width=True):
                     ss.play_vid_week = None
                     ss.scroll_to_player = False
                     st.rerun()
             st.video(f"https://www.youtube.com/watch?v={ss.play_vid_week}")
-            st.caption("點播放器右下角可全螢幕。")
+            st.caption(ui("點播放器右下角可全螢幕。", "Use the player controls for fullscreen."))
             if ss.get("scroll_to_player"):
                 components.html(
                     "<script>try{var d=window.parent.document;"
@@ -1289,10 +1473,15 @@ if _active_section == "week":
                 ss.scroll_to_player = False
 
 if _active_section == "shop":
-    st.markdown("<div class='section-title'>🛒 本週採買清單（YouTube 食材自動加總）</div>",
-                unsafe_allow_html=True)
+    st.markdown(
+        "<div class='section-title'>{}</div>".format(
+            ui("🛒 本週採買清單（YouTube 食材自動加總）",
+               "🛒 This Week's Shopping List (auto-summed from YouTube ingredients)")
+        ),
+        unsafe_allow_html=True,
+    )
     if not CLIENTS_OK:
-        st.info("此功能需要 Secrets 設定。")
+        st.info(ui("此功能需要 Secrets 設定。", "This feature needs Secrets configured."))
     else:
         grid = st.session_state.get("_grid_cache")
         if grid is None:
@@ -1302,7 +1491,8 @@ if _active_section == "shop":
                 grid = {}
         recipes = MP.collect_week_recipes(grid)
         if not recipes:
-            st.info("本週還沒排菜，先去「📅 一週餐表」排幾道吧 🌸")
+            st.info(ui("本週還沒排菜，先去「📅 一週餐表」排幾道吧 🌸",
+                       "No dishes planned this week yet. Add a few in Weekly Plan first 🌸"))
         else:
             try:
                 shopping = R.build_shopping_list(recipes)
@@ -1317,21 +1507,25 @@ if _active_section == "shop":
                     f"padding:22px 26px;margin-bottom:18px;display:flex;flex-wrap:wrap;"
                     f"align-items:center;gap:8px 36px;'>"
                     f"<div><div style='font-size:12px;letter-spacing:2px;text-transform:uppercase;"
-                    f"color:rgba(255,255,255,.55);'>預估總花費 ESTIMATED TOTAL</div>"
+                    f"color:rgba(255,255,255,.55);'>{ui('預估總花費 ESTIMATED TOTAL', 'ESTIMATED TOTAL')}</div>"
                     f"<div class='serif' style='font-weight:900;font-size:2.4rem;margin-top:4px;'>"
                     f"RM {total_lo} – {total_hi}</div></div>"
                     f"<div style='margin-left:auto;text-align:right;font-size:13px;"
                     f"color:rgba(255,255,255,.78);line-height:1.9;'>"
-                    f"🍽️ 本週 {len(recipes)} 餐<br>"
-                    f"每餐平均約 <b style='color:#e7b04a'>RM {_per:.0f}</b></div>"
+                    f"🍽️ {ui(f'本週 {len(recipes)} 餐', f'{len(recipes)} meals this week')}<br>"
+                    f"{ui('每餐平均約', 'Average per meal about')} <b style='color:#e7b04a'>RM {_per:.0f}</b></div>"
                     f"<div style='flex-basis:100%;font-size:12px;color:rgba(255,255,255,.5);'>"
-                    f"依市場行情粗估，未含米油鹽等常備品</div>"
+                    f"{ui('依市場行情粗估，未含米油鹽等常備品', 'Rough market estimate; pantry staples are not included')}</div>"
                     f"</div>",
                     unsafe_allow_html=True)
                 cat_emojis = {"蔬菜": "🥬", "肉類": "🍗", "海鮮": "🐟", "蛋豆製品": "🥚",
                               "調味料": "🧄", "乾貨雜貨": "🛍️", "其他": "🧺"}
+                cat_en = {"蔬菜": "Vegetables", "肉類": "Meat", "海鮮": "Seafood", "蛋豆製品": "Eggs & Soy",
+                          "調味料": "Seasonings", "乾貨雜貨": "Dry Goods", "其他": "Other"}
                 cols = st.columns(3)
-                lines = ["🌸 本週採買清單", f"估計買菜費：RM {total_lo} – {total_hi}", ""]
+                lines = ([ui("🌸 本週採買清單", "🌸 This Week's Shopping List"),
+                          ui(f"估計買菜費：RM {total_lo} – {total_hi}",
+                             f"Estimated market cost: RM {total_lo} – {total_hi}"), ""])
                 idx = 0
                 for cat, items in shopping.items():
                     with cols[idx % 3]:
@@ -1342,9 +1536,9 @@ if _active_section == "shop":
                             f"<b style='color:#c0492b'>{it['amount']}</b></div>"
                             for it in items)
                         st.markdown(f"<div class='card'><b style='color:#2b211a'>"
-                                    f"{cat_emojis.get(cat, '🛍️')} {cat}</b><br>{items_html}</div>",
+                                    f"{cat_emojis.get(cat, '🛍️')} {ui(cat, cat_en.get(cat, cat))}</b><br>{items_html}</div>",
                                     unsafe_allow_html=True)
-                    lines.append(f"【{cat}】")
+                    lines.append(f"【{ui(cat, cat_en.get(cat, cat))}】")
                     lines += [f"  □ {it['name']}  {it['amount']}" for it in items]
                     lines.append("")
                     idx += 1
@@ -1352,23 +1546,25 @@ if _active_section == "shop":
                 text = "\n".join(lines)
                 dl1, dl2 = st.columns(2)
                 with dl1:
-                    st.download_button("⬇️ 下載採買清單（帶去市場）", text,
-                                       file_name="本週採買清單.txt", use_container_width=True)
+                    st.download_button(ui("⬇️ 下載採買清單（帶去市場）", "⬇️ Download Shopping List"),
+                                       text,
+                                       file_name=ui("本週採買清單.txt", "weekly-shopping-list.txt"),
+                                       use_container_width=True)
                 with dl2:
                     _wa = text if len(text) <= 1500 else text[:1500] + "\n…"
-                    st.link_button("💬 用 WhatsApp 分享清單",
+                    st.link_button(ui("💬 用 WhatsApp 分享清單", "💬 Share via WhatsApp"),
                                    "https://wa.me/?text=" + urllib.parse.quote(_wa),
                                    use_container_width=True)
             except Exception as e:
-                st.error(f"採買清單錯誤：{e}")
+                st.error(ui(f"採買清單錯誤：{e}", f"Shopping list error: {e}"))
 
 
 # ================ 💰 花費總覽 ================
 if _active_section == "budget":
-    st.markdown("<div class='section-title'>💰 本週每日餐費估算（依市場行情粗估）</div>",
+    st.markdown(f"<div class='section-title'>{ui('💰 本週每日餐費估算（依市場行情粗估）', '💰 Daily Meal Cost Estimate (rough market estimate)')}</div>",
                 unsafe_allow_html=True)
     if not CLIENTS_OK:
-        st.info("此功能需要 Secrets 設定。")
+        st.info(ui("此功能需要 Secrets 設定。", "This feature needs Secrets configured."))
     else:
         grid = st.session_state.get("_grid_cache")
         if grid is None:
@@ -1377,10 +1573,9 @@ if _active_section == "budget":
             except Exception:
                 grid = {}
         if not grid:
-            st.info("本週還沒排菜。")
+            st.info(ui("本週還沒排菜。", "No dishes planned this week yet."))
         else:
             mon = MP.week_start(st.session_state.get("week_anchor", date.today()))
-            week_names = ["一", "二", "三", "四", "五", "六", "日"]
             rows = []
             for d in range(7):
                 day = mon + timedelta(days=d)
@@ -1388,33 +1583,40 @@ if _active_section == "budget":
                 dinner = grid.get((str(day), "晚"), [])
                 lc = sum(dish_mid_cost(x.get("ingredients")) for x in lunch)
                 dc = sum(dish_mid_cost(x.get("ingredients")) for x in dinner)
-                rows.append({"星期": f"週{week_names[d]}",
-                             "午餐": "、".join(x["title"][:10] for x in lunch) or "—",
-                             "晚餐": "、".join(x["title"][:10] for x in dinner) or "—",
-                             "當日估費": round(lc + dc)})
+                rows.append({
+                    ui("星期", "Day"): weekday_short(d),
+                    ui("午餐", "Lunch"): "、".join(x["title"][:10] for x in lunch) or "—",
+                    ui("晚餐", "Dinner"): "、".join(x["title"][:10] for x in dinner) or "—",
+                    ui("當日估費", "Est. Cost"): round(lc + dc),
+                })
             df = pd.DataFrame(rows)
             b1, b2 = st.columns([1.3, 1])
             with b1:
-                st.dataframe(df[["星期", "午餐", "晚餐", "當日估費"]],
-                             use_container_width=True, hide_index=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
             with b2:
-                chart_df = df.set_index("星期")[["當日估費"]].rename(columns={"當日估費": "RM"})
+                chart_df = df.set_index(ui("星期", "Day"))[[ui("當日估費", "Est. Cost")]].rename(columns={ui("當日估費", "Est. Cost"): "RM"})
                 st.bar_chart(chart_df, color="#c0492b")
-                wk = int(df["當日估費"].sum())
-                avg = df["當日估費"].mean()
-                st.markdown(f"<div class='card'>📌 本週估計合計約 <b style='color:#c0492b'>RM {wk}</b>，"
-                            f"平均每天約 <b style='color:#c0492b'>RM {avg:.0f}</b>"
-                            f"（粗估，未含米油鹽等常備品）</div>", unsafe_allow_html=True)
+                wk = int(df[ui("當日估費", "Est. Cost")].sum())
+                avg = df[ui("當日估費", "Est. Cost")].mean()
+                st.markdown(ui(
+                    f"<div class='card'>📌 本週估計合計約 <b style='color:#c0492b'>RM {wk}</b>，"
+                    f"平均每天約 <b style='color:#c0492b'>RM {avg:.0f}</b>"
+                    f"（粗估，未含米油鹽等常備品）</div>",
+                    f"<div class='card'>📌 Estimated weekly total: <b style='color:#c0492b'>RM {wk}</b>; "
+                    f"average per day: <b style='color:#c0492b'>RM {avg:.0f}</b>. "
+                    f"Rough estimate, pantry staples not included.</div>",
+                ), unsafe_allow_html=True)
 
 
 # ================ 👵 樂齡專區 ================
 if _active_section == "elderly":
-    st.markdown("<div class='section-title'>👵 適合家有年長者的食譜</div>",
+    st.markdown(f"<div class='section-title'>{ui('👵 適合家有年長者的食譜', '👵 Senior-Friendly Recipes')}</div>",
                 unsafe_allow_html=True)
     st.session_state.setdefault("people_eld", 4)
     _es1, _es2 = st.columns([1, 1.6])
     with _es1:
-        st.session_state.people_eld = people_stepper(st.session_state.people_eld, "elder")
+        st.session_state.people_eld = people_stepper(st.session_state.people_eld, "elder",
+                                                     label=ui("👨‍👩‍👧 用餐人數", "👨‍👩‍👧 People"))
     n_eld = st.session_state.people_eld
     elder_recipes = [r for r in RECIPES if r.get("elderly_ok")]
     cols = st.columns(3)
@@ -1426,30 +1628,56 @@ if _active_section == "elderly":
                         f"<span class='cost-badge'>💰 RM {lo2} – {hi2}</span>"
                         f"<div class='note'>👵 {r.get('elderly_note', '')}</div></div>",
                         unsafe_allow_html=True)
-    st.markdown("<div class='card'><b style='color:#2b211a'>🤍 為長輩備餐的小提醒</b><br>" +
-                "<br>".join(ELDERLY_TIPS) + "</div>", unsafe_allow_html=True)
+    _elder_tips = "<br>".join(ELDERLY_TIPS) if st.session_state.get("app_lang") != "en" else (
+        "Favor softer textures and moderate seasoning.<br>"
+        "Include enough protein in each meal.<br>"
+        "Keep soups warm but not overly salty.<br>"
+        "Cut fish and meat into easy-to-chew pieces.<br>"
+        "Adjust portions to appetite and medical advice."
+    )
+    st.markdown(f"<div class='card'><b style='color:#2b211a'>{ui('🤍 為長輩備餐的小提醒', '🤍 Senior Meal Reminders')}</b><br>" +
+                _elder_tips + "</div>", unsafe_allow_html=True)
 
 
 # ================ 💡 小貼士 ================
 if _active_section == "tips":
     t1, t2 = st.columns(2)
     with t1:
-        st.markdown("<div class='card'><b style='color:#2b211a'>🧺 市場採買小貼士</b><br>" +
-                    "<br>".join(MARKET_TIPS) + "</div>", unsafe_allow_html=True)
+        _market_tips = "<br>".join(MARKET_TIPS) if st.session_state.get("app_lang") != "en" else (
+            "Go early for fresher seafood and vegetables.<br>"
+            "Compare prices across stalls before buying larger items.<br>"
+            "For fish, look for clear eyes, firm flesh, and a clean smell.<br>"
+            "Bring your list by category so shopping is faster.<br>"
+            "Keep cold items together and cook seafood as soon as possible."
+        )
+        st.markdown(f"<div class='card'><b style='color:#2b211a'>{ui('🧺 市場採買小貼士', '🧺 Market Shopping Tips')}</b><br>" +
+                    _market_tips + "</div>", unsafe_allow_html=True)
     with t2:
-        st.markdown("""<div class='card'><b style='color:#2b211a'>🌸 使用小撇步</b><br>
+        st.markdown(ui("""<div class='card'><b style='color:#2b211a'>🌸 使用小撇步</b><br>
         ① 「📊 市場行情」先看這個月什麼變便宜<br>
         ② 「🔍 找菜」輸入想煮的菜 → 卡片結果可直接播放、排進餐表<br>
         ③ 「📅 一週餐表」可手動排，或按 🪄 一鍵生成填滿一週<br>
         ④ 「🛒 採買清單」自動加總食材＋估價，可下載或 WhatsApp 分享<br>
         ⑤ 「💰 花費總覽」看本週每天大概要花多少
-        </div>""", unsafe_allow_html=True)
-        st.markdown("""<div class='card'><b style='color:#2b211a'>📍 之後可以擴充</b><br>
+        </div>""",
+        """<div class='card'><b style='color:#2b211a'>🌸 Quick Tips</b><br>
+        ① Check Market Prices first to see what is cheaper this month<br>
+        ② Search a dish in Explore Recipes, then play or add it to the plan<br>
+        ③ Build Weekly Plan manually, or use 🪄 auto-generate<br>
+        ④ Shopping List sums ingredients and estimates cost; download or share via WhatsApp<br>
+        ⑤ Budget shows the rough daily meal cost
+        </div>"""), unsafe_allow_html=True)
+        st.markdown(ui("""<div class='card'><b style='color:#2b211a'>📍 之後可以擴充</b><br>
         ・更精準的估價（接 LLM 依亞庇市價估每道菜）<br>
         ・收藏「我家最愛」常用菜單<br>
         ・節慶菜單（農曆新年、中秋圍爐）
-        </div>""", unsafe_allow_html=True)
+        </div>""",
+        """<div class='card'><b style='color:#2b211a'>📍 Possible Next Upgrades</b><br>
+        ・More precise dish-level estimates with local KK pricing<br>
+        ・Save household favorites<br>
+        ・Festival menus for Lunar New Year, Mid-Autumn, and family gatherings
+        </div>"""), unsafe_allow_html=True)
 
-st.markdown("<p style='text-align:center;color:#b39a6e;font-size:0.8rem;margin-top:18px'>"
-            "🌸 今天煮什麼？ · 為亞庇的妳設計 · 估價為市場常見推算，實際以當日市價為準</p>",
+st.markdown(f"<p style='text-align:center;color:#b39a6e;font-size:0.8rem;margin-top:18px'>"
+            f"{ui('🌸 今天煮什麼？ · 為亞庇的妳設計 · 估價為市場常見推算，實際以當日市價為準', '🌸 What to Cook Today? · Built for Kota Kinabalu families · Estimates are rough and actual market prices may vary')}</p>",
             unsafe_allow_html=True)
