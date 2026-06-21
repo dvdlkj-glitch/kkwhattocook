@@ -1,10 +1,13 @@
 [server]
-# 讓 ./static 內的檔案可由 app/static/<檔名> 取用（影片背景用）
+# 讓 ./static 內的檔案可由 app/static/<檔名> 取用
 enableStaticServing = true
+
+[runner]
+fastReruns = true
 
 [theme]
 base = "light"
-primaryColor = "#B4456A"
-backgroundColor = "#FDF4F6"
-secondaryBackgroundColor = "#FFFFFF"
-textColor = "#5C3A47"
+primaryColor = "#c0492b"
+backgroundColor = "#f6efe4"
+secondaryBackgroundColor = "#fffdf8"
+textColor = "#2b211a"
